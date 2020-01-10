@@ -1,6 +1,5 @@
 package com.example.bluet.bt;
 
-import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.os.Bundle;
@@ -9,6 +8,7 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -19,7 +19,7 @@ import com.example.bluet.util.ToastUtil;
 import java.io.File;
 
 
-public class BtClientActivity extends Activity implements BtBase.Listener, BtReceiver.Listener, BtDevAdapter.Listener {
+public class BtClientActivity extends AppCompatActivity implements BtBase.Listener, BtReceiver.Listener, BtDevAdapter.Listener {
     private TextView mTips;
     private EditText mInputMsg;
     private EditText mInputFile;

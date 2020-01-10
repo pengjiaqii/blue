@@ -1,6 +1,5 @@
 package com.example.bluet.ble;
 
-import android.app.Activity;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
@@ -14,6 +13,7 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -27,7 +27,7 @@ import java.util.UUID;
 /**
  * BLE客户端(主机/中心设备/Central)
  */
-public class BleClientActivity extends Activity {
+public class BleClientActivity extends AppCompatActivity {
     private static final String TAG = BleClientActivity.class.getSimpleName();
     private EditText mWriteET;
     private TextView mTips;

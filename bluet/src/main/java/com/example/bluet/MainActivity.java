@@ -1,13 +1,14 @@
 package com.example.bluet;
 
 import android.Manifest;
-import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.bluet.ble.BleClientActivity;
 import com.example.bluet.ble.BleServerActivity;
@@ -16,7 +17,7 @@ import com.example.bluet.bt.BtServerActivity;
 import com.example.bluet.util.ToastUtil;
 
 
-public class MainActivity extends Activity {
+public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

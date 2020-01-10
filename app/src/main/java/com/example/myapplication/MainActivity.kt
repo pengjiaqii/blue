@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import com.example.takephoto.SelectPhotoUtil
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.File
 import java.io.FileInputStream
@@ -20,13 +21,20 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        selectPhotoUtil = SelectPhotoUtil(this, true, object : SelectPhotoUtil.OnResult {
-            override fun onResultFile(file: File) {
-                Log.d("jade", "文件File：$file")
-                image.setImageBitmap(getLocalBitmap(file))
+        selectPhotoUtil = SelectPhotoUtil.getInstance(this)
 
+        //是否打开裁剪，默认为false，关闭状态
+        selectPhotoUtil?.setIsCrop(true)
+
+        selectPhotoUtil?.setIOnImageResult { file ->
+            Log.d("jade", "文件File：$file")
+            if (null != file) {
+                image.setImageBitmap(getLocalBitmap(file))
+            } else {
+                image.setImageResource(R.mipmap.ic_launcher_round)
             }
-        })
+        }
+
 
         showDialogTv.setOnClickListener {
             selectPhotoUtil?.showDialog()
@@ -54,7 +62,11 @@ class MainActivity : AppCompatActivity() {
     /**
      * 权限回调
      */
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
         selectPhotoUtil?.attrRequestPermissionsResult(requestCode, permissions, grantResults)
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }

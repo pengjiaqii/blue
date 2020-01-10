@@ -1,6 +1,5 @@
 package com.example.bluet.ble;
 
-import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -21,6 +20,8 @@ import android.os.SystemClock;
 import android.util.Log;
 import android.widget.TextView;
 
+import androidx.appcompat.app.AppCompatActivity;
+
 import com.example.bluet.R;
 import com.example.bluet.util.ToastUtil;
 
@@ -31,7 +32,7 @@ import java.util.UUID;
 /**
  * BLE服务端(从机/外围设备/peripheral)
  */
-public class BleServerActivity extends Activity {
+public class BleServerActivity extends AppCompatActivity {
     public static final UUID UUID_SERVICE = UUID.fromString("10000000-0000-0000-0000-000000000000"); //自定义UUID
     public static final UUID UUID_CHAR_READ_NOTIFY = UUID.fromString("11000000-0000-0000-0000-000000000000");
     public static final UUID UUID_DESC_NOTITY = UUID.fromString("11100000-0000-0000-0000-000000000000");
