@@ -1,0 +1,2 @@
+include ':app', ':bluet'
+rootProject.name='MyApplication'
