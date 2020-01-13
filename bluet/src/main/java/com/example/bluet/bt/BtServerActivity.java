@@ -10,11 +10,13 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.bluet.R;
-import com.example.bluet.util.ToastUtil;
+import com.example.bluetooth.bt.BtBase;
+import com.example.bluetooth.bt.BtServer;
+import com.example.bluetooth.util.ToastUtil;
 
 import java.io.File;
 
-
+@Deprecated
 public class BtServerActivity extends AppCompatActivity implements BtBase.Listener {
     private TextView mTips;
     private EditText mInputMsg;
@@ -30,7 +32,7 @@ public class BtServerActivity extends AppCompatActivity implements BtBase.Listen
         mInputMsg = findViewById(R.id.input_msg);
         mInputFile = findViewById(R.id.input_file);
         mLogs = findViewById(R.id.tv_log);
-        mServer = new BtServer(this);
+        mServer = new BtServer(BtServerActivity.this,this);
     }
 
     @Override
@@ -44,22 +46,22 @@ public class BtServerActivity extends AppCompatActivity implements BtBase.Listen
         if (mServer.isConnected(null)) {
             String msg = mInputMsg.getText().toString();
             if (TextUtils.isEmpty(msg))
-                ToastUtil.showShortToast("消息不能空");
+                ToastUtil.showShortToast(BtServerActivity.this,"消息不能空");
             else
                 mServer.sendMsg(msg);
         } else
-            ToastUtil.showShortToast("没有连接");
+            ToastUtil.showShortToast(BtServerActivity.this,"没有连接");
     }
 
     public void sendFile(View view) {
         if (mServer.isConnected(null)) {
             String filePath = mInputFile.getText().toString();
             if (TextUtils.isEmpty(filePath) || !new File(filePath).isFile())
-                ToastUtil.showShortToast("文件无效");
+                ToastUtil.showShortToast(BtServerActivity.this,"文件无效");
             else
                 mServer.sendFile(filePath);
         } else
-            ToastUtil.showShortToast("没有连接");
+            ToastUtil.showShortToast(BtServerActivity.this,"没有连接");
     }
 
     @Override
@@ -83,6 +85,6 @@ public class BtServerActivity extends AppCompatActivity implements BtBase.Listen
                 mLogs.append(msg);
                 break;
         }
-        ToastUtil.showShortToast(msg);
+        ToastUtil.showShortToast(BtServerActivity.this,msg);
     }
 }

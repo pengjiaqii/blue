@@ -1,10 +1,11 @@
-package com.example.bluet.bt;
+package com.example.bluetooth.bt;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
+import android.content.Context;
 
-import com.example.bluet.util.Util;
+import com.example.bluetooth.util.Util;
 
 
 /**
@@ -14,8 +15,8 @@ public class BtServer extends BtBase {
     private static final String TAG = BtServer.class.getSimpleName();
     private BluetoothServerSocket mSSocket;
 
-    BtServer(Listener listener) {
-        super(listener);
+    public BtServer(Context context, Listener listener) {
+        super(context, listener);
         listen();
     }
 

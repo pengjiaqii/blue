@@ -1,4 +1,4 @@
-package com.example.bluet;
+package com.example.bluetooth;
 
 import java.util.List;
 import java.util.UUID;

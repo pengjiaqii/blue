@@ -29,8 +29,8 @@ public class BleDevAdapter extends RecyclerView.Adapter<BleDevAdapter.VH> {
     private final List<BleDev> mDevices = new ArrayList<>();
     public boolean isScanning;
 
-    //10秒搜索时间
-    private static final long SCAN_PERIOD = 10000;
+    //搜索时间
+    private static final long SCAN_PERIOD = 15000;
     // 扫描到的蓝牙设备的Callback
     private final ScanCallback mScanCallback = new ScanCallback() {
         @Override
@@ -40,12 +40,24 @@ public class BleDevAdapter extends RecyclerView.Adapter<BleDevAdapter.VH> {
             //            .getBytes());
             //Base64 Encoded
             if (!mDevices.contains(dev)) {
+                Log.d(TAG,"dev: "+ dev);
                 mDevices.add(dev);
                 notifyDataSetChanged();
                 Log.i(TAG, "onScanResult: " + result); // result.getScanRecord() 获取BLE广播数据
             }
         }
     };
+
+    private final BluetoothAdapter.LeScanCallback mLeScanCallback = new BluetoothAdapter.LeScanCallback() {
+
+        @Override
+        public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
+            Log.d(TAG,"device: "+ device);
+        }
+
+    };
+
+
 
     BleDevAdapter(Listener listener) {
         mListener = listener;
@@ -64,15 +76,17 @@ public class BleDevAdapter extends RecyclerView.Adapter<BleDevAdapter.VH> {
         isScanning = true;
         //        BluetoothAdapter bluetoothAdapter = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE)
         //        .getDefaultAdapter();
-        BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        final BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         bluetoothAdapter.startDiscovery();
         final BluetoothLeScanner bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
         // Android5.0新增的扫描API，扫描返回的结果更友好，比如BLE广播数据以前是byte[] scanRecord，而新API帮我们解析成ScanRecord类
-        bluetoothLeScanner.startScan(mScanCallback);
+//        bluetoothLeScanner.startScan(mScanCallback);
+        bluetoothAdapter.startLeScan(mLeScanCallback);
         mHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                bluetoothLeScanner.stopScan(mScanCallback); //停止扫描
+//                bluetoothLeScanner.stopScan(mScanCallback); //停止扫描
+                bluetoothAdapter.stopLeScan(mLeScanCallback); //停止扫描
                 isScanning = false;
             }
         }, SCAN_PERIOD);

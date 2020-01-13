@@ -1,4 +1,6 @@
-package com.example.bluet;
+package com.example.bluetooth.util;
+
+import com.example.bluetooth.BleAdvertisedData;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;

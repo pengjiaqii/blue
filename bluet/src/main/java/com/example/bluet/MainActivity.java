@@ -14,7 +14,7 @@ import com.example.bluet.ble.BleClientActivity;
 import com.example.bluet.ble.BleServerActivity;
 import com.example.bluet.bt.BtClientActivity;
 import com.example.bluet.bt.BtServerActivity;
-import com.example.bluet.util.ToastUtil;
+import com.example.bluetooth.util.ToastUtil;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -27,7 +27,7 @@ public class MainActivity extends AppCompatActivity {
         // 检查蓝牙开关
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         if (adapter == null) {
-            ToastUtil.showShortToast("本机没有找到蓝牙硬件或驱动！");
+            ToastUtil.showShortToast(MainActivity.this,"本机没有找到蓝牙硬件或驱动！");
             finish();
             return;
         } else {
@@ -41,7 +41,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 检查是否支持BLE蓝牙
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
-            ToastUtil.showShortToast("本机不支持低功耗蓝牙！");
+            ToastUtil.showShortToast(MainActivity.this,"本机不支持低功耗蓝牙！");
             finish();
             return;
         }

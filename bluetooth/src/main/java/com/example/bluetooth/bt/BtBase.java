@@ -1,13 +1,14 @@
-package com.example.bluet.bt;
+package com.example.bluetooth.bt;
 
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.content.Context;
 import android.os.Environment;
+import android.os.Handler;
 import android.util.Log;
 
-import com.example.bluet.BlueToothApplication;
-import com.example.bluet.util.ToastUtil;
-import com.example.bluet.util.Util;
+import com.example.bluetooth.util.ToastUtil;
+import com.example.bluetooth.util.Util;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -31,11 +32,13 @@ public class BtBase {
     private BluetoothSocket mSocket;
     private DataOutputStream mOut;
     private Listener mListener;
+    private Context mContext;
     private boolean isRead;
     private boolean isSending;
     private BluetoothDevice mRemoteDevice;
 
-    BtBase(Listener listener) {
+    BtBase(Context context,Listener listener) {
+        mContext = context;
         mListener = listener;
     }
 
@@ -191,14 +194,14 @@ public class BtBase {
     // ============================================通知UI===========================================================
     private boolean checkSend() {
         if (isSending) {
-            ToastUtil.showShortToast("正在发送其它数据,请稍后再发...");
+            ToastUtil.showShortToast(mContext,"正在发送其它数据,请稍后再发...");
             return true;
         }
         return false;
     }
 
     private void notifyUI(final int state, final Object obj) {
-        BlueToothApplication.runUi(new Runnable() {
+        new Handler().post(new Runnable() {
             @Override
             public void run() {
                 try {

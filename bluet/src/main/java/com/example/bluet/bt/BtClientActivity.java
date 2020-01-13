@@ -13,8 +13,10 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.bluet.R;
-import com.example.bluet.util.BtReceiver;
-import com.example.bluet.util.ToastUtil;
+import com.example.bluetooth.BtReceiver;
+import com.example.bluetooth.bt.BtBase;
+import com.example.bluetooth.bt.BtClient;
+import com.example.bluetooth.util.ToastUtil;
 
 import java.io.File;
 
@@ -26,7 +28,7 @@ public class BtClientActivity extends AppCompatActivity implements BtBase.Listen
     private TextView mLogs;
     private BtReceiver mBtReceiver;
     private final BtDevAdapter mBtDevAdapter = new BtDevAdapter(this);
-    private final BtClient mClient = new BtClient(this);
+    private final BtClient mClient = new BtClient(BtClientActivity.this,this);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,11 +57,11 @@ public class BtClientActivity extends AppCompatActivity implements BtBase.Listen
     @Override
     public void onItemClick(BluetoothDevice dev) {
         if (mClient.isConnected(dev)) {
-            ToastUtil.showShortToast("已经连接了");
+            ToastUtil.showShortToast(BtClientActivity.this,"已经连接了");
             return;
         }
         mClient.connect(dev);
-        ToastUtil.showShortToast("正在连接...");
+        ToastUtil.showShortToast(BtClientActivity.this,"正在连接...");
         mTips.setText("正在连接...");
     }
 
@@ -77,22 +79,22 @@ public class BtClientActivity extends AppCompatActivity implements BtBase.Listen
         if (mClient.isConnected(null)) {
             String msg = mInputMsg.getText().toString();
             if (TextUtils.isEmpty(msg))
-                ToastUtil.showShortToast("消息不能空");
+                ToastUtil.showShortToast(BtClientActivity.this,"消息不能空");
             else
                 mClient.sendMsg(msg);
         } else
-            ToastUtil.showShortToast("没有连接");
+            ToastUtil.showShortToast(BtClientActivity.this,"没有连接");
     }
 
     public void sendFile(View view) {
         if (mClient.isConnected(null)) {
             String filePath = mInputFile.getText().toString();
             if (TextUtils.isEmpty(filePath) || !new File(filePath).isFile())
-                ToastUtil.showShortToast("文件无效");
+                ToastUtil.showShortToast(BtClientActivity.this,"文件无效");
             else
                 mClient.sendFile(filePath);
         } else
-            ToastUtil.showShortToast("没有连接");
+            ToastUtil.showShortToast(BtClientActivity.this,"没有连接");
     }
 
     @Override
@@ -115,6 +117,6 @@ public class BtClientActivity extends AppCompatActivity implements BtBase.Listen
                 mLogs.append(msg);
                 break;
         }
-        ToastUtil.showShortToast(msg);
+        ToastUtil.showShortToast(BtClientActivity.this,msg);
     }
 }

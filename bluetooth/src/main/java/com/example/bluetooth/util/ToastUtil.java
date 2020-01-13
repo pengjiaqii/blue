@@ -1,9 +1,9 @@
-package com.example.bluet.util;
+package com.example.bluetooth.util;
 
+import android.annotation.SuppressLint;
+import android.content.Context;
 import android.view.Gravity;
 import android.widget.Toast;
-
-import com.example.bluet.BlueToothApplication;
 
 /**
  * 作者 : pengjiaqi
@@ -11,18 +11,20 @@ import com.example.bluet.BlueToothApplication;
  * 日期 : 2020/1/7 13:37
  * 功能 :
  */
+@SuppressLint("ShowToast")
 public class ToastUtil {
-    private static Toast toast;//实现不管我们触发多少次Toast调用，都只会持续一次Toast显示的时长
+    private volatile static Toast toast;//实现不管我们触发多少次Toast调用，都只会持续一次Toast显示的时长
 
     /**
      * 短时间显示Toast【居下】
      *
      * @param msg 显示的内容-字符串
      */
-    public static void showShortToast(String msg) {
-        if (BlueToothApplication.getAppContext() != null) {
+
+    public static void showShortToast(Context context, String msg) {
+        if (null != context) {
             if (toast == null) {
-                toast = Toast.makeText(BlueToothApplication.getAppContext(), msg, Toast.LENGTH_SHORT);
+                toast = Toast.makeText(context, msg, Toast.LENGTH_SHORT);
             } else {
                 toast.setText(msg);
             }
@@ -35,10 +37,10 @@ public class ToastUtil {
      *
      * @param msg 显示的内容-字符串
      */
-    public static void showShortToastCenter(String msg) {
-        if (BlueToothApplication.getAppContext() != null) {
+    public static void showShortToastCenter(Context context, String msg) {
+        if (null != context) {
             if (toast == null) {
-                toast = Toast.makeText(BlueToothApplication.getAppContext(), msg, Toast.LENGTH_SHORT);
+                toast = Toast.makeText(context, msg, Toast.LENGTH_SHORT);
                 toast.setGravity(Gravity.CENTER, 0, 0);
             } else {
                 toast.setText(msg);
@@ -52,10 +54,10 @@ public class ToastUtil {
      *
      * @param msg 显示的内容-字符串
      */
-    public static void showShortToastTop(String msg) {
-        if (BlueToothApplication.getAppContext() != null) {
+    public static void showShortToastTop(Context context, String msg) {
+        if (null != context) {
             if (toast == null) {
-                toast = Toast.makeText(BlueToothApplication.getAppContext(), msg, Toast.LENGTH_SHORT);
+                toast = Toast.makeText(context, msg, Toast.LENGTH_SHORT);
                 toast.setGravity(Gravity.TOP, 0, 0);
             } else {
                 toast.setText(msg);
@@ -69,10 +71,10 @@ public class ToastUtil {
      *
      * @param msg 显示的内容-字符串
      */
-    public static void showLongToast(String msg) {
-        if (BlueToothApplication.getAppContext() != null) {
+    public static void showLongToast(Context context, String msg) {
+        if (null != context) {
             if (toast == null) {
-                toast = Toast.makeText(BlueToothApplication.getAppContext(), msg, Toast.LENGTH_LONG);
+                toast = Toast.makeText(context, msg, Toast.LENGTH_LONG);
             } else {
                 toast.setText(msg);
             }
@@ -85,10 +87,10 @@ public class ToastUtil {
      *
      * @param msg 显示的内容-字符串
      */
-    public static void showLongToastCenter(String msg) {
-        if (BlueToothApplication.getAppContext() != null) {
+    public static void showLongToastCenter(Context context, String msg) {
+        if (null != context) {
             if (toast == null) {
-                toast = Toast.makeText(BlueToothApplication.getAppContext(), msg, Toast.LENGTH_LONG);
+                toast = Toast.makeText(context, msg, Toast.LENGTH_LONG);
                 toast.setGravity(Gravity.CENTER, 0, 0);
             } else {
                 toast.setText(msg);
@@ -102,10 +104,10 @@ public class ToastUtil {
      *
      * @param msg 显示的内容-字符串
      */
-    public static void showLongToastTop(String msg) {
-        if (BlueToothApplication.getAppContext() != null) {
+    public static void showLongToastTop(Context context,String msg) {
+        if (null != context) {
             if (toast == null) {
-                toast = Toast.makeText(BlueToothApplication.getAppContext(), msg, Toast.LENGTH_LONG);
+                toast = Toast.makeText(context, msg, Toast.LENGTH_LONG);
                 toast.setGravity(Gravity.TOP, 0, 0);
             } else {
                 toast.setText(msg);

@@ -23,7 +23,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.bluet.R;
-import com.example.bluet.util.ToastUtil;
+import com.example.bluetooth.util.ToastUtil;
 
 import java.util.Arrays;
 import java.util.UUID;
@@ -32,6 +32,7 @@ import java.util.UUID;
 /**
  * BLE服务端(从机/外围设备/peripheral)
  */
+@Deprecated
 public class BleServerActivity extends AppCompatActivity {
     public static final UUID UUID_SERVICE = UUID.fromString("10000000-0000-0000-0000-000000000000"); //自定义UUID
     public static final UUID UUID_CHAR_READ_NOTIFY = UUID.fromString("11000000-0000-0000-0000-000000000000");
@@ -201,7 +202,7 @@ public class BleServerActivity extends AppCompatActivity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                ToastUtil.showShortToast(msg);
+                ToastUtil.showShortToast(BleServerActivity.this,msg);
                 mTips.append(msg + "\n\n");
             }
         });

@@ -1,113 +1,102 @@
 package com.example.bluet.ble;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCallback;
-import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattDescriptor;
-import android.bluetooth.BluetoothGattService;
-import android.bluetooth.BluetoothProfile;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 import android.view.View;
-import android.widget.EditText;
+import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.example.bluet.R;
-import com.example.bluet.util.ToastUtil;
+import com.example.bluetooth.ble.BleManager;
+import com.example.bluetooth.ble.TypeConversion;
+import com.example.bluetooth.ble.bean.MessageBean;
+import com.example.bluetooth.ble.bean.SearchResult;
+import com.example.bluetooth.ble.listener.OnConnectListener;
+import com.example.bluetooth.ble.listener.OnReceiveMessageListener;
+import com.example.bluetooth.ble.listener.OnSearchDeviceListener;
+import com.example.bluetooth.ble.listener.OnSendMessageListener;
 
-import java.util.Arrays;
-import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
  * BLE客户端(主机/中心设备/Central)
  */
 public class BleClientActivity extends AppCompatActivity {
-    private static final String TAG = BleClientActivity.class.getSimpleName();
-    private EditText mWriteET;
-    private TextView mTips;
-    private BleDevAdapter mBleDevAdapter;
-    private BluetoothGatt mBluetoothGatt;
-    private boolean isConnected = false;
-
-    // 与服务端连接的Callback
-    public BluetoothGattCallback mBluetoothGattCallback = new BluetoothGattCallback() {
+    public static final String TAG = "BleClientActivity";
+    private BleManager bluemanage;
+    private int progress = 0;
+    //连接状态
+    private TextView statusView;
+    private TextView contextView;
+    private ProgressBar progressBar;
+    private StringBuilder stringBuilder;
+    //设备数据
+    private List<SearchResult> mDevices;
+    //设备列表的adapter
+    private DeviceListAdapter mAdapter;
+    //列表
+    private RecyclerView recycleView;
+    private RelativeLayout devieslist;
+    private RelativeLayout deviesinfo;
+    //与某个设备连接的监听
+    private OnConnectListener onConnectListener;
+    //发送消息的监听
+    private OnSendMessageListener onSendMessageListener;
+    //搜索蓝牙设备的监听
+    private OnSearchDeviceListener onSearchDeviceListener;
+    //接收消息的监听
+    private OnReceiveMessageListener onReceiveMessageListener;
+    @SuppressLint("HandlerLeak")
+    private Handler handler = new Handler() {
+        // 0 修改状态  1 更新进度  2 体检完成  3 体检数据进度 4 连接成功
         @Override
-        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-            BluetoothDevice dev = gatt.getDevice();
-            Log.i(TAG, String.format("onConnectionStateChange:%s,%s,%s,%s", dev.getName(), dev.getAddress(), status, newState));
-            if (status == BluetoothGatt.GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED) {
-                isConnected = true;
-                gatt.discoverServices(); //启动服务发现
-            } else {
-                isConnected = false;
-                closeConn();
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            String message = msg.obj.toString();
+            switch (msg.what) {
+                case 0:
+                    statusView.setText(message);
+                    break;
+                case 1:
+                    stringBuilder.append(message + " \n");
+                    contextView.setText(stringBuilder.toString());
+                    progress += 4;
+                    progressBar.setProgress(progress);
+                    break;
+                case 2:
+                    progress = 100;
+                    progressBar.setProgress(progress);
+                    break;
+                case 3:
+                    statusView.setText("接收完成！");
+                    stringBuilder.delete(0, stringBuilder.length());
+                    stringBuilder.append(message);
+                    contextView.setText(stringBuilder.toString());
+                    break;
+                case 4:
+                    statusView.setText(message);
+                    deviesinfo.setVisibility(View.VISIBLE);
+                    devieslist.setVisibility(View.GONE);
+                    break;
             }
-            logTv(String.format(status == 0 ? (newState == 2 ? "与[%s]连接成功" : "与[%s]连接断开") : ("与[%s]连接出错,错误码:" + status), dev));
-        }
-
-        @Override
-        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-            Log.i(TAG, String.format("onServicesDiscovered:%s,%s,%s", gatt.getDevice().getName(), gatt.getDevice().getAddress(), status));
-            if (status == BluetoothGatt.GATT_SUCCESS) { //BLE服务发现成功
-                // 遍历获取BLE服务Services/Characteristics/Descriptors的全部UUID
-                for (BluetoothGattService service : gatt.getServices()) {
-                    StringBuilder allUUIDs = new StringBuilder("UUIDs={\nS=" + service.getUuid().toString());
-                    for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
-                        allUUIDs.append(",\nC=").append(characteristic.getUuid());
-                        for (BluetoothGattDescriptor descriptor : characteristic.getDescriptors())
-                            allUUIDs.append(",\nD=").append(descriptor.getUuid());
-                    }
-                    allUUIDs.append("}");
-                    Log.i(TAG, "onServicesDiscovered:" + allUUIDs.toString());
-                    logTv("发现服务" + allUUIDs);
-                }
-            }
-        }
-
-        @Override
-        public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
-            UUID uuid = characteristic.getUuid();
-            String valueStr = new String(characteristic.getValue());
-            Log.i(TAG, String.format("onCharacteristicRead:%s,%s,%s,%s,%s", gatt.getDevice().getName(), gatt.getDevice().getAddress(), uuid, valueStr, status));
-            logTv("读取Characteristic[" + uuid + "]:\n" + valueStr);
-        }
-
-        @Override
-        public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
-            UUID uuid = characteristic.getUuid();
-            String valueStr = new String(characteristic.getValue());
-            Log.i(TAG, String.format("onCharacteristicWrite:%s,%s,%s,%s,%s", gatt.getDevice().getName(), gatt.getDevice().getAddress(), uuid, valueStr, status));
-            logTv("写入Characteristic[" + uuid + "]:\n" + valueStr);
-        }
-
-        @Override
-        public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-            UUID uuid = characteristic.getUuid();
-            String valueStr = new String(characteristic.getValue());
-            Log.i(TAG, String.format("onCharacteristicChanged:%s,%s,%s,%s", gatt.getDevice().getName(), gatt.getDevice().getAddress(), uuid, valueStr));
-            logTv("通知Characteristic[" + uuid + "]:\n" + valueStr);
-        }
-
-        @Override
-        public void onDescriptorRead(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
-            UUID uuid = descriptor.getUuid();
-            String valueStr = Arrays.toString(descriptor.getValue());
-            Log.i(TAG, String.format("onDescriptorRead:%s,%s,%s,%s,%s", gatt.getDevice().getName(), gatt.getDevice().getAddress(), uuid, valueStr, status));
-            logTv("读取Descriptor[" + uuid + "]:\n" + valueStr);
-        }
-
-        @Override
-        public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
-            UUID uuid = descriptor.getUuid();
-            String valueStr = Arrays.toString(descriptor.getValue());
-            Log.i(TAG, String.format("onDescriptorWrite:%s,%s,%s,%s,%s", gatt.getDevice().getName(), gatt.getDevice().getAddress(), uuid, valueStr, status));
-            logTv("写入Descriptor[" + uuid + "]:\n" + valueStr);
         }
     };
 
@@ -115,103 +104,261 @@ public class BleClientActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_bleclient);
-        RecyclerView rv = findViewById(R.id.rv_ble);
-        mWriteET = findViewById(R.id.et_write);
-        mTips = findViewById(R.id.tv_tips);
-        rv.setLayoutManager(new LinearLayoutManager(this));
-        mBleDevAdapter = new BleDevAdapter(new BleDevAdapter.Listener() {
+
+        mDevices = new ArrayList<>();
+        mAdapter = new DeviceListAdapter(R.layout.device_list_item, mDevices);
+        stringBuilder = new StringBuilder();
+        devieslist = findViewById(R.id.parent_r1);
+        deviesinfo = findViewById(R.id.parent_r2);
+        progressBar = findViewById(R.id.progressbar);
+        recycleView = findViewById(R.id.blue_rv);
+        recycleView.setLayoutManager(new LinearLayoutManager(getApplicationContext()));
+        contextView = findViewById(R.id.context);
+        statusView = findViewById(R.id.status);
+        recycleView.setAdapter(mAdapter);
+        //蓝牙权限申请，特别注意这个位置权限，6.0以上不添加这个权限搜不到蓝牙
+        if (Build.VERSION.SDK_INT >= 23) {
+            if (ContextCompat.checkSelfPermission(BleClientActivity.this,
+                    Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 2);
+                if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+                        Manifest.permission.READ_CONTACTS)) {
+                    Toast.makeText(BleClientActivity.this, "shouldShowRequestPermissionRationale", Toast.LENGTH_SHORT).show();
+                }
+            }
+        }
+        //初始化蓝牙管理，设置监听
+        initBlueManager();
+        //为控件添加点击事件监听
+        initListener();
+    }
+
+    /**
+     * 初始化蓝牙管理，设置监听
+     */
+    public void initBlueManager() {
+        //搜索蓝牙设备的监听
+        onSearchDeviceListener = new OnSearchDeviceListener() {
             @Override
-            public void onItemClick(BluetoothDevice dev) {
-                closeConn();
-                mBluetoothGatt = dev.connectGatt(BleClientActivity.this, false, mBluetoothGattCallback); // 连接蓝牙设备
-                logTv(String.format("与[%s]开始连接............", dev));
+            public void onStartDiscovery() {
+                sendMessage(0, "正在搜索设备..");
+                Log.d(TAG, "onStartDiscovery()");
+
+            }
+
+            @Override
+            public void onNewDeviceFound(BluetoothDevice device) {
+                Log.d(TAG, "new device: " + device.getName() + " " + device.getAddress());
+            }
+
+            @Override
+            public void onSearchCompleted(List<SearchResult> bondedList, List<SearchResult> newList) {
+                Log.d(TAG, "搜索完成: bondedList" + bondedList.toString());
+                Log.d(TAG, "搜索完成: newList" + newList.toString());
+                sendMessage(0, "搜索完成,点击列表进行连接！");
+                mDevices.clear();
+                mDevices.addAll(newList);
+                mAdapter.notifyDataSetChanged();
+                deviesinfo.setVisibility(View.GONE);
+                devieslist.setVisibility(View.VISIBLE);
+            }
+
+            @Override
+            public void onError(Exception e) {
+                sendMessage(0, "搜索失败");
+            }
+        };
+        //与某个设备连接的监听
+        onConnectListener = new OnConnectListener() {
+            @Override
+            public void onConnectStart() {
+                sendMessage(0, "开始连接");
+                Log.i("blue", "onConnectStart");
+            }
+
+            @Override
+            public void onConnecting() {
+                sendMessage(0, "正在连接..");
+                Log.i("blue", "onConnecting");
+            }
+
+            @Override
+            public void onConnectFailed() {
+                sendMessage(0, "连接失败！");
+                Log.i("blue", "onConnectFailed");
+
+            }
+
+            @Override
+            public void onConnectSuccess(String mac) {
+                sendMessage(4, "连接成功 MAC: " + mac);
+                Log.i("blue", "onConnectSuccess");
+            }
+
+            @Override
+            public void onError(Exception e) {
+                sendMessage(0, "连接异常！");
+                Log.i("blue", "onError");
+            }
+        };
+        //发送消息的监听
+        onSendMessageListener = new OnSendMessageListener() {
+            @Override
+            public void onSuccess(int status, String response) {
+                sendMessage(0, "发送成功！");
+                Log.i("blue", "发送消息成功! ");
+            }
+
+            @Override
+            public void onConnectionLost(Exception e) {
+                sendMessage(0, "连接断开！");
+                Log.i("blue", "发送消息为onConnectionLost ! ");
+            }
+
+            @Override
+            public void onError(Exception e) {
+                sendMessage(0, "发送失败！");
+                Log.i("blue", "发送消息为onError ! ");
+            }
+        };
+        //接收消息的监听
+        onReceiveMessageListener = new OnReceiveMessageListener() {
+
+
+            @Override
+            public void onProgressUpdate(String what, int progress) {
+                sendMessage(1, what);
+            }
+
+            @Override
+            public void onDetectDataUpdate(String what) {
+                sendMessage(3, what);
+            }
+
+            @Override
+            public void onDetectDataFinish() {
+                sendMessage(2, "接收完成！");
+                Log.i("blue", "接收消息为onDetectDataFinish");
+            }
+
+            @Override
+            public void onNewLine(String s) {
+                sendMessage(3, s);
+            }
+
+            @Override
+            public void onConnectionLost(Exception e) {
+                sendMessage(0, "连接断开");
+                Log.i("blue", "接收消息为onConnectionLost! ");
+            }
+
+            @Override
+            public void onError(Exception e) {
+                Log.i("blue", "接收消息为onError ! ");
+            }
+        };
+        //BLE蓝牙的管理器，封装起来的工具类
+        bluemanage = BleManager.getInstance(getApplicationContext());
+        bluemanage.setOnSearchDeviceListener(onSearchDeviceListener);
+        bluemanage.setOnConnectListener(onConnectListener);
+        bluemanage.setOnSendMessageListener(onSendMessageListener);
+        bluemanage.setOnReceiveMessageListener(onReceiveMessageListener);
+        bluemanage.requestEnableBt();
+    }
+
+    /**
+     * 为控件添加事件监听
+     */
+    public void initListener() {
+        //蓝牙设备列表的点击事件
+        mAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
+            @Override
+            public void onItemClick(BaseQuickAdapter adapter, View view, int position) {
+                String mac = mDevices.get(position).getAddress();
+                bluemanage.connectDevice(mac);
             }
         });
-        rv.setAdapter(mBleDevAdapter);
+        //搜索设备的点击事件
+        findViewById(R.id.btn_search).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                bluemanage.setReadVersion(false);
+                //开始搜索
+                bluemanage.searchDevices();
+            }
+        });
+
+        findViewById(R.id.get_sn).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                MessageBean item = new MessageBean(TypeConversion.getDeviceVersion());
+                bluemanage.setReadVersion(true);
+                bluemanage.sendMessage(item, true);
+            }
+        });
+
+        findViewById(R.id.btn_close).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                bluemanage.closeDevice();
+                contextView.setText(null);
+                devieslist.setVisibility(View.VISIBLE);
+                deviesinfo.setVisibility(View.GONE);
+            }
+        });
+
+        findViewById(R.id.btn_send).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                bluemanage.setReadVersion(false);
+                progress = 0;
+                progressBar.setProgress(progress);
+                stringBuilder.delete(0, stringBuilder.length());
+                contextView.setText("");
+                MessageBean item = new MessageBean(TypeConversion.startDetect());
+                bluemanage.sendMessage(item, true);
+            }
+        });
+    }
+
+    /**
+     * @param type    0 修改状态  1 更新进度  2 体检完成  3 体检数据进度
+     * @param context
+     */
+    public void sendMessage(int type, String context) {
+        if (handler != null) {
+            Message message = handler.obtainMessage();
+            message.what = type;
+            message.obj = context;
+            handler.sendMessage(message);
+        }
+    }
+
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == 2) {
+            if (permissions[0].equals(Manifest.permission.ACCESS_COARSE_LOCATION) && grantResults[0]
+                    == PackageManager.PERMISSION_GRANTED) {
+            } else {
+                if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.
+                        permission.ACCESS_COARSE_LOCATION)) {
+                    return;
+                }
+            }
+        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        closeConn();
-    }
-
-    // BLE中心设备连接外围设备的数量有限(大概2~7个)，在建立新连接之前必须释放旧连接资源，否则容易出现连接错误133
-    private void closeConn() {
-        if (mBluetoothGatt != null) {
-            mBluetoothGatt.disconnect();
-            mBluetoothGatt.close();
+        if (bluemanage != null) {
+            bluemanage.close();
+            bluemanage = null;
         }
-    }
-
-    // 扫描BLE
-    public void reScan(View view) {
-        if (mBleDevAdapter.isScanning)
-            ToastUtil.showShortToast("正在扫描...");
-        else
-            mBleDevAdapter.reScan();
-    }
-
-    // 注意：连续频繁读写数据容易失败，读写操作间隔最好200ms以上，或等待上次回调完成后再进行下次读写操作！
-    // 读取数据成功会回调->onCharacteristicChanged()
-    public void read(View view) {
-        BluetoothGattService service = getGattService(BleServerActivity.UUID_SERVICE);
-        if (service != null) {
-            BluetoothGattCharacteristic characteristic = service.getCharacteristic(BleServerActivity.UUID_CHAR_READ_NOTIFY);//通过UUID获取可读的Characteristic
-            mBluetoothGatt.readCharacteristic(characteristic);
+        if (handler != null) {
+            handler.removeCallbacksAndMessages(null);
+            handler = null;
         }
+
     }
 
-    // 注意：连续频繁读写数据容易失败，读写操作间隔最好200ms以上，或等待上次回调完成后再进行下次读写操作！
-    // 写入数据成功会回调->onCharacteristicWrite()
-    public void write(View view) {
-        BluetoothGattService service = getGattService(BleServerActivity.UUID_SERVICE);
-        if (service != null) {
-            String text = mWriteET.getText().toString();
-            BluetoothGattCharacteristic characteristic = service.getCharacteristic(BleServerActivity.UUID_CHAR_WRITE);//通过UUID获取可写的Characteristic
-            characteristic.setValue(text.getBytes()); //单次最多20个字节
-            mBluetoothGatt.writeCharacteristic(characteristic);
-        }
-    }
-
-    // 设置通知Characteristic变化会回调->onCharacteristicChanged()
-    public void setNotify(View view) {
-        BluetoothGattService service = getGattService(BleServerActivity.UUID_SERVICE);
-        if (service != null) {
-            // 设置Characteristic通知
-            BluetoothGattCharacteristic characteristic = service.getCharacteristic(BleServerActivity.UUID_CHAR_READ_NOTIFY);//通过UUID获取可通知的Characteristic
-            mBluetoothGatt.setCharacteristicNotification(characteristic, true);
-
-            // 向Characteristic的Descriptor属性写入通知开关，使蓝牙设备主动向手机发送数据
-            BluetoothGattDescriptor descriptor = characteristic.getDescriptor(BleServerActivity.UUID_DESC_NOTITY);
-            // descriptor.setValue(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE);//和通知类似,但服务端不主动发数据,只指示客户端读取数据
-            descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-            mBluetoothGatt.writeDescriptor(descriptor);
-        }
-    }
-
-    // 获取Gatt服务
-    private BluetoothGattService getGattService(UUID uuid) {
-        if (!isConnected) {
-            ToastUtil.showShortToast("没有连接");
-            return null;
-        }
-        BluetoothGattService service = mBluetoothGatt.getService(uuid);
-        if (service == null)
-            ToastUtil.showShortToast("没有找到服务UUID=" + uuid);
-        return service;
-    }
-
-    // 输出日志
-    private void logTv(final String msg) {
-        if (isDestroyed())
-            return;
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                ToastUtil.showShortToast(msg);
-                mTips.append(msg + "\n\n");
-            }
-        });
-    }
 }

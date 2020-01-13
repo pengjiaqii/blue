@@ -1,18 +1,19 @@
-package com.example.bluet.bt;
+package com.example.bluetooth.bt;
 
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.content.Context;
 import android.util.Log;
 
-import com.example.bluet.util.Util;
+import com.example.bluetooth.util.Util;
 
 
 /**
  * 客户端，与服务端建立长连接
  */
 public class BtClient extends BtBase {
-    BtClient(Listener listener) {
-        super(listener);
+    public BtClient(Context context, Listener listener) {
+        super(context, listener);
     }
 
     /**
