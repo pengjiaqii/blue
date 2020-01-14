@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Build;
+import android.os.Handler;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -206,6 +207,14 @@ public class BleManager {
                 mBluetoothAdapter.stopLeScan(mLeScanCallback);
             //开始搜索，详情见回调
             mBluetoothAdapter.startLeScan(mLeScanCallback);
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    //结束扫描
+                    mBluetoothAdapter.stopLeScan(mLeScanCallback);
+
+                }
+            },10000);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -481,7 +490,7 @@ public class BleManager {
                 mRemoteDevice = mBluetoothAdapter.getRemoteDevice(mac);
                 mBluetoothAdapter.cancelDiscovery();
                 mCurrStatus = STATUS.FREE;
-                Log.d(TAG, "prepare to connect: " + mRemoteDevice.getAddress() + " " + mRemoteDevice.getName());
+                Log.d(TAG, "准备连接: " + mRemoteDevice.getAddress() + " " + mRemoteDevice.getName());
                 mSocket = mRemoteDevice.createInsecureRfcommSocketToServiceRecord(UUID.fromString(Constants.STR_UUID));
                 onConnectListener.onConnecting();
                 mSocket.connect();

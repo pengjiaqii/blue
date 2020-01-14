@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-
+@Deprecated
 public class BleDevAdapter extends RecyclerView.Adapter<BleDevAdapter.VH> {
     private static final String TAG = BleDevAdapter.class.getSimpleName();
     private final Listener mListener;

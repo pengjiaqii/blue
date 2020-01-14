@@ -31,6 +31,7 @@ class MainActivity : AppCompatActivity() {
             if (null != file) {
                 image.setImageBitmap(getLocalBitmap(file))
             } else {
+                //默认的话
                 image.setImageResource(R.mipmap.ic_launcher_round)
             }
         }
@@ -48,7 +49,7 @@ class MainActivity : AppCompatActivity() {
      * @param file
      * @return
      */
-    fun getLocalBitmap(file: File): Bitmap? {
+    private fun getLocalBitmap(file: File): Bitmap? {
         return try {
             val fis = FileInputStream(file)
             BitmapFactory.decodeStream(fis)
@@ -62,11 +63,7 @@ class MainActivity : AppCompatActivity() {
     /**
      * 权限回调
      */
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         selectPhotoUtil?.attrRequestPermissionsResult(requestCode, permissions, grantResults)
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
