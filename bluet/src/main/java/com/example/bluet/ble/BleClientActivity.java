@@ -13,7 +13,6 @@ import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -121,10 +120,6 @@ public class BleClientActivity extends AppCompatActivity {
             if (ContextCompat.checkSelfPermission(BleClientActivity.this,
                     Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 2);
-                if (ActivityCompat.shouldShowRequestPermissionRationale(this,
-                        Manifest.permission.READ_CONTACTS)) {
-                    Toast.makeText(BleClientActivity.this, "shouldShowRequestPermissionRationale", Toast.LENGTH_SHORT).show();
-                }
             }
         }
         //初始化蓝牙管理，设置监听
@@ -153,8 +148,8 @@ public class BleClientActivity extends AppCompatActivity {
 
             @Override
             public void onSearchCompleted(List<SearchResult> bondedList, List<SearchResult> newList) {
-                Log.d(TAG, "搜索完成: bondedList" + bondedList.toString());
-                Log.d(TAG, "搜索完成: newList" + newList.toString());
+                Log.d(TAG, "搜索完成: 以前绑定过的bondedList" + bondedList.toString());
+                Log.d(TAG, "搜索完成: 现在新的所有搜索到的newList" + newList.toString());
                 sendMessage(0, "搜索完成,点击列表进行连接！");
                 mDevices.clear();
                 mDevices.addAll(newList);

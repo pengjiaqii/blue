@@ -108,13 +108,16 @@ public class SelectPhotoUtil {
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     private void requestReadExternalPermission(int requestCode) {
-        if (mActivity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            if (!mActivity.shouldShowRequestPermissionRationale(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+        if ((mActivity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)||
+                (mActivity.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)||
+                (mActivity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)) {
+//            if (!mActivity.shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
                 mActivity.requestPermissions(new String[]{Manifest.permission.CAMERA,
                         Manifest.permission.READ_EXTERNAL_STORAGE,
                         Manifest.permission.WRITE_EXTERNAL_STORAGE}, requestCode);
-            }
+//            }
         } else {
+            //权限同意了的话
             if (requestCode == REQUEST_SYSTEM_TAKE_PICTURE) {
                 //去拍照
                 getCamera();
@@ -256,7 +259,9 @@ public class SelectPhotoUtil {
                 getGallery();
             }
         } else {
-            Toast.makeText(mActivity, "授权失败！", Toast.LENGTH_SHORT).show();
+            //授权失败，去设置界面
+            SystemPermissionUtil.GoToSetting(mActivity);
+            Toast.makeText(mActivity, "请打开相机权限！", Toast.LENGTH_SHORT).show();
         }
     }
 

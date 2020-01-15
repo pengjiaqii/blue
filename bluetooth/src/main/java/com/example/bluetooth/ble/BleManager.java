@@ -403,7 +403,7 @@ public class BleManager {
                     mExecutorService.submit(connectDeviceRunnable);
                 }
             } else {
-                Log.i(TAG, "蓝色已连接！");
+                Log.i(TAG, "蓝牙已连接！");
             }
         } catch (IllegalArgumentException e) {
             e.printStackTrace();
