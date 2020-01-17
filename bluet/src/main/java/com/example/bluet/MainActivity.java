@@ -8,7 +8,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.bluet.ble.BleClientActivity;
@@ -58,6 +57,9 @@ public class MainActivity extends AppCompatActivity {
                 if (checkSelfPermission(str) != PackageManager.PERMISSION_GRANTED) {
                     requestPermissions(permissions, 111);
                     break;
+                } else {
+                    //权限全部通过，已经申请过了
+
                 }
             }
         }
@@ -92,9 +94,5 @@ public class MainActivity extends AppCompatActivity {
         startActivity(new Intent(this, BleServerActivity.class));
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
 
-    }
 }

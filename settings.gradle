@@ -1,2 +1,2 @@
-include ':app', ':bluet', ':takephoto', ':bluetooth'
+include ':photo', ':bluet', ':takephoto', ':bluetooth', ':mediarecorder', ':alertdemo'
 rootProject.name='MyApplication'

@@ -8,9 +8,11 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/alertdemo" />
             <option value="$PROJECT_DIR$/bluet" />
             <option value="$PROJECT_DIR$/bluetooth" />
+            <option value="$PROJECT_DIR$/mediarecorder" />
+            <option value="$PROJECT_DIR$/photo" />
             <option value="$PROJECT_DIR$/takephoto" />
           </set>
         </option>
