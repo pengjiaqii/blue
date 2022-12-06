@@ -36,16 +36,29 @@ public class WhiteListUtil {
     }
 
 
-    public void query(String wl_num) {
+    public ArrayList<WhiteListEntity> query(String query_wl_num) {
+        ArrayList<WhiteListEntity> whiteListEntities = new ArrayList<>();
         Uri uri = Uri.parse("content://com.android.launcher3.contactprovider/whitelist");
         String where = "wl_num=?";
-        String[] where_args = {wl_num};
+        String[] where_args = {query_wl_num};
         Cursor cursor = resolver.query(uri, null, where, where_args, null);
         while (cursor.moveToNext()) {
-            Log.i(TAG, "query----->" + cursor.getString(cursor.getColumnIndex("wl_num")));
-            Log.i(TAG, "query----->" + cursor.getString(cursor.getColumnIndex("wl_name")));
-            Log.i(TAG, "query----->" + cursor.getString(cursor.getColumnIndex("wl_phone")));
+            WhiteListEntity entity = new WhiteListEntity();
+            String wl_num = cursor.getString(cursor.getColumnIndex("wl_num"));
+            Log.i(TAG, "queryAll----->" + wl_num);
+            entity.setWl_num(wl_num);
+
+            String wl_name = cursor.getString(cursor.getColumnIndex("wl_name"));
+            Log.i(TAG, "queryAll----->" + wl_name);
+            entity.setWl_name(wl_name);
+
+            String wl_phone = cursor.getString(cursor.getColumnIndex("wl_phone"));
+            Log.i(TAG, "queryAll----->" + wl_phone);
+            entity.setWl_phone(wl_phone);
+
+            whiteListEntities.add(entity);
         }
+        return whiteListEntities;
     }
 
     public ArrayList<WhiteListEntity> queryAll() {
