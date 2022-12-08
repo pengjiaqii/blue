@@ -1,5 +1,16 @@
 package com.example.demo.util;
 
+import android.annotation.SuppressLint;
+import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
+import android.util.Log;
+import android.widget.Toast;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -10,18 +21,6 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
-
-import android.annotation.SuppressLint;
-import android.app.Service;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.os.Handler;
-import android.os.IBinder;
-import android.os.RemoteException;
-import android.util.Log;
-
-import com.example.demo.ITcpService;
 
 public class StudentCardService extends Service {
     public static final String TAG = "StudentCardService";
@@ -47,12 +46,12 @@ public class StudentCardService extends Service {
 
     private ReadThread mReadThread;
 
-    private ITcpService.Stub iTcpService = new ITcpService.Stub() {
-        @Override
-        public void sendMessage(String message) throws RemoteException {
-            sendMsg(message);
-        }
-    };
+    //    private ITcpService.Stub iTcpService = new ITcpService.Stub() {
+    //        @Override
+    //        public void sendMessage(String message) throws RemoteException {
+    //            sendMsg(message);
+    //        }
+    //    };
     private double latitude;
     private double longitude;
     private SendThread sendThread;
@@ -61,7 +60,7 @@ public class StudentCardService extends Service {
     @Override
     public IBinder onBind(Intent arg0) {
         Log.d(TAG, "TcpService：onBind");
-        return (IBinder) iTcpService;
+        return null;
     }
 
     String v2Signal = "";
@@ -89,6 +88,11 @@ public class StudentCardService extends Service {
         v2Signal = "*WT," + serialNum + ",V2," + hhmmss + ",A," + latitude + "," + longitude + "," + ddmmyy + ",FFFFDFFF";
 
         new InitSocketThread().start();
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        return Service.START_STICKY;
     }
 
     @Override
@@ -254,7 +258,9 @@ public class StudentCardService extends Service {
                             mHandler.post(new Runnable() {
                                 @Override
                                 public void run() {
-                                    String replyMessage = DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()).handleCmdMessage(message);
+                                    String replyMessage =
+                                            DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()
+                                                    , StudentCardService.this).handleCmdMessage(message);
                                     Log.v(TAG, "replyMessage:" + replyMessage);
                                     sendMsg(replyMessage);
                                 }
@@ -268,14 +274,20 @@ public class StudentCardService extends Service {
         }
     }
 
-    public class ShutdownBroadcastReceiver extends BroadcastReceiver {
-        private static final String ACTION_SHUTDOWN = "android.intent.action.ACTION_SHUTDOWN";
-
+    public class MyReceiver extends BroadcastReceiver {
         @Override
-        public void onReceive(Context context, Intent intent) {  //即将关机时，要做的事情
-            if (intent.getAction().equals(ACTION_SHUTDOWN)) {
-                Log.i(TAG, "ShutdownBroadcastReceiver onReceive(), Do thing!");
-                sendMsg("关机关机");
+        public void onReceive(Context context, Intent intent) {
+            Log.d(TAG, "收到广播：" + intent.getAction());
+            if ("com.studentcard.tcp.broadcast".equals(intent.getAction())) {
+                Bundle bundle = intent.getExtras();
+                if (bundle != null) {
+                    String text = bundle.getString("is_sos_call");
+                    if ("SOSCALL".equals(text)) {
+                        DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()
+                                , StudentCardService.this).uploadSOSData();
+                    }
+                    Toast.makeText(context, "成功接收广播：" + text, Toast.LENGTH_LONG).show();
+                }
             }
         }
     }
@@ -299,8 +311,8 @@ public class StudentCardService extends Service {
     //
     //        latitude = location.getLatitude();//纬度
     //        longitude = location.getLongitude();//经度
-    //        Log.i("TcpService", "location.latitude: " + latitude);
-    //        Log.i("TcpService", "location.longitude:  " + longitude);
+    //        Log.i(TAG, "location.latitude: " + latitude);
+    //        Log.i(TAG, "location.longitude:  " + longitude);
     //
     //        // 设置每2秒获取一次GPS的定位信息
     //        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 8f, new LocationListener() {
@@ -322,7 +334,7 @@ public class StudentCardService extends Service {
     //            //当坐标改变时触发此函数，如果Provider传进相同的坐标，它就不会被触发
     //            @Override
     //            public void onLocationChanged(Location loc) {
-    //                Log.i("TcpService", "onLocationChanged");
+    //                Log.i(TAG, "onLocationChanged");
     //                //            location = loc;
     //                //            showLocation();
     //            }

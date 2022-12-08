@@ -4,6 +4,33 @@ public class WhiteListEntity {
     private String wl_num;
     private String wl_name;
     private String wl_phone;
+    private String wl_type;
+    private String wl_meid;
+    private String wl_pic;
+
+    public String getWl_type() {
+        return wl_type;
+    }
+
+    public void setWl_type(String wl_type) {
+        this.wl_type = wl_type;
+    }
+
+    public String getWl_meid() {
+        return wl_meid;
+    }
+
+    public void setWl_meid(String wl_meid) {
+        this.wl_meid = wl_meid;
+    }
+
+    public String getWl_pic() {
+        return wl_pic;
+    }
+
+    public void setWl_pic(String wl_pic) {
+        this.wl_pic = wl_pic;
+    }
 
     public String getWl_num() {
         return wl_num;
@@ -35,6 +62,9 @@ public class WhiteListEntity {
                 "wl_num='" + wl_num + '\'' +
                 ", wl_name='" + wl_name + '\'' +
                 ", wl_phone='" + wl_phone + '\'' +
+                ", wl_type='" + wl_type + '\'' +
+                ", wl_meid='" + wl_meid + '\'' +
+                ", wl_pic='" + wl_pic + '\'' +
                 '}';
     }
 }

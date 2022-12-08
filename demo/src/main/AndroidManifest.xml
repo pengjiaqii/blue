@@ -47,11 +47,14 @@
             </intent-filter>
         </activity>
 
-        <receiver android:name=".util.StudentCardService$ShutdownBroadcastReceiver">
+        <receiver android:name=".util.StudentCardService$MyReceiver"
+            android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.ACTION_SHUTDOWN" />
+                <action android:name="com.studentcard.tcp.broadcast" />
             </intent-filter>
         </receiver>
+
+
     </application>
 
 </manifest>

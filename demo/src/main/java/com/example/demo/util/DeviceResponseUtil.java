@@ -5,12 +5,10 @@ import android.app.KeyguardManager;
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.database.Cursor;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Handler;
@@ -18,10 +16,16 @@ import android.os.Message;
 import android.os.PowerManager;
 import android.telecom.PhoneAccountHandle;
 import android.telecom.TelecomManager;
+import android.telephony.CellInfo;
+import android.telephony.CellInfoLte;
+import android.telephony.CellLocation;
+import android.telephony.NeighboringCellInfo;
 import android.telephony.PhoneStateListener;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
+import android.telephony.cdma.CdmaCellLocation;
+import android.telephony.gsm.GsmCellLocation;
 import android.util.Log;
 
 
@@ -33,7 +37,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -55,6 +58,7 @@ public class DeviceResponseUtil {
     private static volatile DeviceResponseUtil instance;
     private final TelephonyManager telephonyManager;
     private final AudioManager mAudioManager;
+    private final StudentCardService mService;
     private Context mContext;
 
     private ContentResolver mResolver;
@@ -92,11 +96,32 @@ public class DeviceResponseUtil {
     private ContentResolver resolver;
 
     public String handleCmdMessage(String message) {
+        hhmmss = new SimpleDateFormat("HHmmss", Locale.getDefault()).format(new Date());
+        ddmmyy = new SimpleDateFormat("ddMMyy", Locale.getDefault()).format(new Date());
+
+        latitude = LocationUtils.getInstance(mContext).getLatitude();
+        longitude = LocationUtils.getInstance(mContext).getLongitude();
 
         currentMusic = mAudioManager.getStreamVolume(3);
         currentCall = mAudioManager.getStreamVolume(0);
 
         mContext.registerReceiver(mReceiver, mFilter);
+
+        @SuppressLint("MissingPermission")
+        CellLocation cellLocation = telephonyManager.getCellLocation();
+        if (telephonyManager.getPhoneType() == TelephonyManager.PHONE_TYPE_CDMA) {
+            //电信
+            CdmaCellLocation cdmaCellLocation = (CdmaCellLocation) cellLocation;
+            int cid = cdmaCellLocation.getBaseStationId();
+            int lac = cdmaCellLocation.getNetworkId();
+        } else {
+            //移动联通
+            GsmCellLocation gsmCellLocation = (GsmCellLocation) cellLocation;
+            int cid = gsmCellLocation.getCid();
+            int lac = gsmCellLocation.getLac();
+        }
+
+        uploadSOSData();
 
         if (message.contains("WT") && message.contains("SETSOS")) {
             return setSOSNumber(message);
@@ -110,6 +135,7 @@ public class DeviceResponseUtil {
             return "";
         }
     }
+
 
     /**
      * 设置白名单号码
@@ -174,8 +200,8 @@ public class DeviceResponseUtil {
         WhiteListUtil.getInstance(mContext).queryAll();
 
         return "*WT," + serialNum + ",V4" + ",PBWL," + lastTime + "," + splitMeg[4] + "," + splitMeg[5] +
-                "," + splitMeg[6] + "," + splitMeg[7] + "," + hhmmss + ",V," + latitude +
-                "," + longitude + "," + ddmmyy + ",FFFFFFFD";
+                "," + splitMeg[6] + "," + splitMeg[7] + "," + splitMeg[8] + "," + hhmmss + ",V," + latitude +
+                "," + longitude + "," + ddmmyy + ",FFFFFFFD#";
     }
 
 
@@ -186,8 +212,6 @@ public class DeviceResponseUtil {
      * @return
      */
     private String setAllWhiteListNumber(String message) {
-        //*XX,MEID,PBWL,HHMMSS,WL-num,wl-phone,wl_type,wl_meid,wl_name,wl_pic#
-        //*WT,MEID,PBWL,140522,WL-num,17665136602,wl_type,wl_meid,\u661f\u671f\u4e09,wl_pic#
         /**
          *WT,0000000000,PBWLALL,130305,1,13612345678,1,0,5C0F660E,1,2,13612345678,2,0,5C0F660E,1,3,13612345678,3,0,
          5C0F660E,1,4,13612345678,3,0,5C0F660E,1,5,13612345678,3,0,5C0F660E,1,6,13612345678,3,0,5C0F660E,1,7,13612345678,3,0,5C0F660E,1,8,13612345678,3,0,5C0F660E,1,9,13612345678,3,0,5C0F660E,1,10,13612345678,3,,,#
@@ -198,11 +222,11 @@ public class DeviceResponseUtil {
             Log.i(TAG, "meg-array：" + splitMeg[i]);
         }
 
-        ArrayList<ContactEntity> contactEntities = new ArrayList<>();
+        ArrayList<WhiteListEntity> whiteListEntities = new ArrayList<>();
 
         //4-9位是第一个人信息，10-15位是第二个人信息，16-21位是第三个人信息，依次类推，有20个人
         for (int i = 0; i < 20; i++) {
-            ContactEntity contactEntity = new ContactEntity();
+            WhiteListEntity entity = new WhiteListEntity();
             String wl_num = splitMeg[4 + (6 * i)];
             String wl_phone = splitMeg[5 + (6 * i)];
             String wl_type = splitMeg[6 + (6 * i)];
@@ -210,17 +234,23 @@ public class DeviceResponseUtil {
             String wl_name = splitMeg[8 + (6 * i)];
             String wl_pic = splitMeg[9 + (6 * i)];
 
-            contactEntity.setWl_num(wl_num);
-            contactEntity.setName(wl_name);
-            contactEntity.setPhone(wl_phone);
-            contactEntities.add(contactEntity);
+            entity.setWl_num(wl_num);
+            entity.setWl_phone(wl_phone);
+            entity.setWl_type(wl_type);
+            entity.setWl_meid(wl_meid);
+            entity.setWl_name(wl_name);
+            entity.setWl_pic(wl_pic);
+            whiteListEntities.add(entity);
         }
 
-        Log.d(TAG, "contactEntities：" + contactEntities.size());
+        Log.d(TAG, "whiteListEntities：" + whiteListEntities.size());
+        for (WhiteListEntity entity : whiteListEntities) {
+            Log.i(TAG, "WhiteListEntity：" + entity.toString());
+        }
 
         return "*WT," + serialNum + ",V4" + ",PBWLALL," + lastTime + "," + splitMeg[4] + "," + splitMeg[5] +
-                "," + splitMeg[6] + "," + splitMeg[7] + "," + hhmmss + ",V," + latitude +
-                "," + longitude + "," + ddmmyy + ",FFFFFFFD";
+                "," + splitMeg[6] + "," + splitMeg[7] + "," + hhmmss + ",A," + latitude +
+                "," + longitude + "," + ddmmyy + ",FFFFFFFF#";
     }
 
     /**
@@ -261,7 +291,7 @@ public class DeviceResponseUtil {
                 "," + splitMeg[4] + "," + splitMeg[5] + "," + splitMeg[6] +
                 "," + splitMeg[7] + "," + splitMeg[8] + "," + splitMeg[9] +
                 "," + splitMeg[10] + "," + splitMeg[11] + "," + splitMeg[12] +
-                ",V," + latitude + "," + longitude + "," + ddmmyy + ",FDFFFFFF";
+                ",V," + latitude + "," + longitude + "," + ddmmyy + ",FDFFFFFF#";
     }
 
     private int call_index = 0;
@@ -288,16 +318,16 @@ public class DeviceResponseUtil {
         intent.setAction(Intent.ACTION_CALL);
         intent.setData(Uri.parse("tel:" + telNum));
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        TelecomManager telecomManager = (TelecomManager) mContext.getSystemService(Context.TELECOM_SERVICE);
-        if (telecomManager != null) {
-            List<PhoneAccountHandle> phoneAccountHandleList = telecomManager.getCallCapablePhoneAccounts();
-            PhoneAccountHandle phoneAccountHandle = telecomManager.getUserSelectedOutgoingPhoneAccount();
-            if (phoneAccountHandleList != null && phoneAccountHandleList.size() >= 2 && phoneAccountHandle == null) {
-                intent.putExtra(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandleList.get(0));
-            } else {
-                intent.putExtra(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle);
-            }
-        }
+        //        TelecomManager telecomManager = (TelecomManager) mContext.getSystemService(Context.TELECOM_SERVICE);
+        //        if (telecomManager != null) {
+        //            List<PhoneAccountHandle> phoneAccountHandleList = telecomManager.getCallCapablePhoneAccounts();
+        //            PhoneAccountHandle phoneAccountHandle = telecomManager.getUserSelectedOutgoingPhoneAccount();
+        //            if (phoneAccountHandleList != null && phoneAccountHandleList.size() >= 2 && phoneAccountHandle == null) {
+        //                intent.putExtra(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandleList.get(0));
+        //            } else {
+        //                intent.putExtra(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle);
+        //            }
+        //        }
         mContext.startActivity(intent);
     }
 
@@ -407,21 +437,80 @@ public class DeviceResponseUtil {
     }
 
     @SuppressLint("MissingPermission")
-    private DeviceResponseUtil(Context context) {
-        //获取一些基本信息
-        hhmmss = new SimpleDateFormat("HHmmss", Locale.getDefault()).format(new Date());
-        ddmmyy = new SimpleDateFormat("ddMMyy", Locale.getDefault()).format(new Date());
+    public void uploadSOSData() {
+        String message = "";
+        //*WT,866248053277321,SOS,152037,A,2250.2245,N,11391.6189,E,0.11,149,460,11,124968449,30501,5,fc:d7:33:2b:4f:5c,-50,06:1b:6d:c8:3f:85,-74,04:d7:a5:c2:0b:04,-74,52:6b:1c:20:3b:31,-76,d4:68:ba:05:1c:6b,-87,230721,FFFFDFFF#
+        String operator = telephonyManager.getNetworkOperator();
+        int mcc = Integer.parseInt(operator.substring(0, 3));
+        int mnc = Integer.parseInt(operator.substring(3));
 
-        latitude = LocationUtils.getInstance(context).getLatitude();
-        longitude = LocationUtils.getInstance(context).getLongitude();
+        int nPhoneType = telephonyManager.getPhoneType();
+        CellLocation cel = telephonyManager.getCellLocation();
+        int cid = 0;
+        int lac = 0;
+        if (nPhoneType == TelephonyManager.PHONE_TYPE_CDMA) {
+            //电信
+            CdmaCellLocation cdmaCellLocation = (CdmaCellLocation) cel;
+            cid = cdmaCellLocation.getBaseStationId();
+            lac = cdmaCellLocation.getNetworkId();
+        } else {
+            //移动和联通
+            GsmCellLocation gsmCellLocation = (GsmCellLocation) cel;
+            cid = gsmCellLocation.getCid();
+            lac = gsmCellLocation.getLac();
+        }
+        int dbm = 0;
+        List<CellInfo> cellInfoList = telephonyManager.getAllCellInfo();
+        if (cellInfoList != null) {
+            for (CellInfo cellInfo : cellInfoList) {
+                if (cellInfo instanceof CellInfoLte) {
+                    //cast to CellInfoLte and call all the CellInfoLte methods you need
+                    dbm = ((CellInfoLte) cellInfo).getCellSignalStrength().getDbm();
+                    //                    int asu = ((CellInfoLte) cellInfo).getCellSignalStrength().getAsuLevel();
+
+
+                    break;
+                }
+            }
+        }
+
+
+        Log.i(TAG, " MCC = " + mcc + " MNC = " + mnc + " LAC = " + lac + " CID = " + cid);
+
+        // 获取邻区基站信息
+        List<NeighboringCellInfo> infos = telephonyManager.getNeighboringCellInfo();
+        StringBuffer sb = new StringBuffer("总数 : " + infos.size() + " ");
+        for (NeighboringCellInfo info1 : infos) { // 根据邻区总数进行循环
+            sb.append(" LAC : " + info1.getLac()); // 取出当前邻区的LAC
+            sb.append(" CID : " + info1.getCid()); // 取出当前邻区的CID
+            sb.append(" BSSS : " + (-113 + 2 * info1.getRssi()) + " "); // 获取邻区基站信号强度
+        }
+
+
+        //基站信息拼接
+        String baseStation = mcc + "," + mnc + "," + "0" + "," + infos.size() +
+                "," + lac + "," + cid + "," + dbm;
+
+        message = "*WT," + serialNum + ",V4" + ",D1," + hhmmss + ",A," + latitude + "," + longitude +
+                "," + baseStation + "," + ddmmyy + ",FFFFDFFF";
+
+        Log.i(TAG, " 获取邻区基站信息:" + baseStation);
+
+        mService.sendMsg(message);
+    }
+
+
+    @SuppressLint("MissingPermission")
+    private DeviceResponseUtil(Context context, StudentCardService studentCardService) {
+        //获取一些基本信息
 
         mContext = context.getApplicationContext();
         mResolver = mContext.getContentResolver();
 
         mSubscriptionManager = (SubscriptionManager) mContext.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
-        mResolver = mContext.getContentResolver();
         mSubInfoList = mSubscriptionManager.getActiveSubscriptionInfoList();
 
+        mService = studentCardService;
 
         mAudioManager = (AudioManager) context.getSystemService(Service.AUDIO_SERVICE);
         telephonyManager = (TelephonyManager) context.getSystemService(Service.TELEPHONY_SERVICE);
@@ -458,15 +547,14 @@ public class DeviceResponseUtil {
                         //响铃
                         Log.d(TAG, "===CALL_STATE_RINGING===");
                         //1.不在白名单里面的号码响铃立即挂断
-                        ArrayList<ContactEntity> contacts = WhiteContactsUtil.getContacts(mContext);
+                        ArrayList<WhiteListEntity> listEntities = WhiteListUtil.getInstance(mContext).queryAll();
                         ArrayList<String> whitePhoneList = new ArrayList<>();
-                        for (ContactEntity contact : contacts) {
-                            whitePhoneList.add(contact.getPhone());
+                        for (WhiteListEntity entity : listEntities) {
+                            whitePhoneList.add(entity.getWl_phone());
                         }
                         if (!whitePhoneList.contains(phoneNumber)) {
                             //挂断
-                            //mTelecomManager = (TelecomManager) mContext.getSystemService(Context.TELECOM_SERVICE);
-                            //mTelecomManager.endCall();
+                            endCall();
                         }
 
 
@@ -487,8 +575,61 @@ public class DeviceResponseUtil {
     private String handlePositionMonitorD1(String message) {
         String[] split = message.split(",");
         String lastTime = split[split.length - 1];
+        String operator = telephonyManager.getNetworkOperator();
+        int mcc = Integer.parseInt(operator.substring(0, 3));
+        int mnc = Integer.parseInt(operator.substring(3));
 
-        return "*WT," + serialNum + ",V4" + ",D1," + lastTime + "," + hhmmss + ",A," + latitude + "," + longitude + "," + ddmmyy + ",FDFFFFFF";
+        int nPhoneType = telephonyManager.getPhoneType();
+        CellLocation cel = telephonyManager.getCellLocation();
+        int cid = 0;
+        int lac = 0;
+        if (nPhoneType == TelephonyManager.PHONE_TYPE_CDMA) {
+            //电信
+            CdmaCellLocation cdmaCellLocation = (CdmaCellLocation) cel;
+            cid = cdmaCellLocation.getBaseStationId();
+            lac = cdmaCellLocation.getNetworkId();
+        } else {
+            //移动和联通
+            GsmCellLocation gsmCellLocation = (GsmCellLocation) cel;
+            cid = gsmCellLocation.getCid();
+            lac = gsmCellLocation.getLac();
+        }
+        int dbm = 0;
+        List<CellInfo> cellInfoList = telephonyManager.getAllCellInfo();
+        if (cellInfoList != null) {
+            for (CellInfo cellInfo : cellInfoList) {
+                if (cellInfo instanceof CellInfoLte) {
+                    //cast to CellInfoLte and call all the CellInfoLte methods you need
+                    dbm = ((CellInfoLte) cellInfo).getCellSignalStrength().getDbm();
+                    //                    int asu = ((CellInfoLte) cellInfo).getCellSignalStrength().getAsuLevel();
+
+
+                    break;
+                }
+            }
+        }
+
+
+        Log.i(TAG, " MCC = " + mcc + " MNC = " + mnc + " LAC = " + lac + " CID = " + cid);
+
+        // 获取邻区基站信息
+        List<NeighboringCellInfo> infos = telephonyManager.getNeighboringCellInfo();
+        StringBuffer sb = new StringBuffer("总数 : " + infos.size() + " ");
+        for (NeighboringCellInfo info1 : infos) { // 根据邻区总数进行循环
+            sb.append(" LAC : " + info1.getLac()); // 取出当前邻区的LAC
+            sb.append(" CID : " + info1.getCid()); // 取出当前邻区的CID
+            sb.append(" BSSS : " + (-113 + 2 * info1.getRssi()) + " "); // 获取邻区基站信号强度
+        }
+
+
+        //基站信息拼接
+        String baseStation = mcc + "," + mnc + "," + "0" + "," + infos.size() +
+                "," + lac + "," + cid + "," + dbm;
+
+        Log.i(TAG, " baseStation:" + baseStation.toString());
+
+        return "*WT," + serialNum + ",V4" + ",D1," + lastTime + "," + hhmmss + ",A," + latitude + "," + longitude +
+                "," + baseStation + "," + ddmmyy + ",FDFFFFFF";
     }
 
     /**
@@ -508,8 +649,43 @@ public class DeviceResponseUtil {
         return string;
     }
 
+    private void endCall() {
+        Log.i(TAG, "===endCall===");
+        TelecomManager tm = (TelecomManager) mContext.getSystemService(Context.TELECOM_SERVICE);
+        if ((tm != null) && (tm.isInCall()))
+            tm.endCall();
+    }
 
-    public static DeviceResponseUtil getInstance(Context context) {
+//    protected boolean endCall() {
+//        boolean ret = false;
+//        // TODO
+//        try {
+//            ITelephony phone =
+//                    ITelephony.Stub.asInterface(ServiceManager.checkService("phone"));
+//            int subId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+//
+//            for (int i = 0; i < 4; i++) {
+//                int[] subIds = SubscriptionManager.getSubId(i);
+//                if (subIds != null && subIds.length > 0 && subIds[0] != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+//                    subId = subIds[0];
+//                    Log.i(TAG,"endCall: subId=" + subId + " from phoneId=" + i);
+//                    break;
+//                }
+//            }
+//
+//            if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+//                ret = phone.endCallForSubscriber(subId);
+//            } else {
+//                Log.i(TAG,"endCall: failed due to no valid subId, stop test directly!");
+//            }
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//        Log.i(TAG,"endCall ret=" + ret);
+//        return ret;
+//    }
+
+    public static DeviceResponseUtil getInstance(Context context, StudentCardService studentCardService) {
         if (instance == null) {
             synchronized (DeviceResponseUtil.class) {
                 if (instance == null) {
@@ -518,7 +694,7 @@ public class DeviceResponseUtil {
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                    instance = new DeviceResponseUtil(context);
+                    instance = new DeviceResponseUtil(context, studentCardService);
                 }
             }
 
