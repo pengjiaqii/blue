@@ -8,13 +8,11 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Message;
 import android.os.PowerManager;
-import android.telecom.PhoneAccountHandle;
 import android.telecom.TelecomManager;
 import android.telephony.CellInfo;
 import android.telephony.CellInfoLte;
@@ -169,28 +167,8 @@ public class DeviceResponseUtil {
         //        values.put("wl_phone", wl_phone);
         //        db.insert(WhiteListDBOpenHelper.DB_TABLE_NAME, null, values);
         //        db.close();
-        if (null == wl_phone || wl_phone.isEmpty()) {
-            //删除这条数据
-            WhiteListUtil.getInstance(mContext).delete(wl_num);
-        } else {
-            ArrayList<WhiteListEntity> entities = WhiteListUtil.getInstance(mContext).queryAll();
-            entities.stream().forEach(
-                    whiteListEntity -> {
-                        Log.d(TAG, "WhiteListEntity：" + whiteListEntity.toString());
-                        if (wl_num.equals(whiteListEntity.getWl_num())) {
-                            //编号相同的时候避免重复也先删除
-                            WhiteListUtil.getInstance(mContext).delete(wl_num);
-                        }
-                    }
-            );
-            //插入数据，编号，姓名，电话
-            WhiteListUtil.getInstance(mContext).insert(wl_num, wl_name, wl_phone);
-        }
+        insertWhiteList(wl_num, wl_name, wl_phone);
 
-
-        //        WhiteContactsUtil.addContact(mContext, contactEntity);
-        //
-        //        WhiteContactsUtil.getSOSContactsList(mContext);
         //WL-num字段：取值1-20，对应的编号位置1-3对应3个sos号码。4到6对应亲情号，对应123按键。剩下的序列号对应白名单
         if ("1".equals(wl_num) || "2".equals(wl_num) || "3".equals(wl_num)) {
             //sos号码
@@ -262,36 +240,66 @@ public class DeviceResponseUtil {
     private String setSOSNumber(String message) {
         //        acquireUnLock();
         //*WT,IMEI,SETSOS,HHMMSS,sequence,name，phone，sequence1,name,phone,sequence2,name,phone#
-        //        Settings.Global.putString(mContext.getContentResolver(), "sosphone1", "17665136602");
-        //        String sosphone1 = Settings.Global.getString(mContext.getContentResolver(), "sosphone1");
         String[] splitMeg = message.split(",");
         for (int i = 0; i < splitMeg.length; i++) {
             Log.i(TAG, "meg-array：" + splitMeg[i]);
         }
         String lastTime = splitMeg[3];
-        String sosPhone0 = splitMeg[6];
-        String sosPhone1 = splitMeg[9];
-        String sosPhone2 = splitMeg[12];
+        String wl_num0 = splitMeg[4];
+        String wl_name0 = unicodeDecode(splitMeg[5]);
+        String wl_phone0 = splitMeg[6];
 
-        Log.i(TAG, "sosPhone0：" + sosPhone0);
-        Log.i(TAG, "sosPhone1：" + sosPhone1);
-        Log.i(TAG, "sosPhone2：" + sosPhone2);
+        String wl_num1 = splitMeg[7];
+        String wl_name1 = unicodeDecode(splitMeg[8]);
+        String wl_phone1 = splitMeg[9];
+
+        String wl_num2 = splitMeg[10];
+        String wl_name2 = unicodeDecode(splitMeg[11]);
+        String wl_phone2 = splitMeg[12];
 
 
-        SharedPreferences sp = mContext.getSharedPreferences("sos_phone", 0);
-        SharedPreferences.Editor editor = sp.edit();
-        editor.putString("sosPhone0", sosPhone0);
-        editor.putString("sosPhone1", sosPhone1);
-        editor.putString("sosPhone2", sosPhone2);
-        editor.apply();
-        mHandler.post(loopTask);
+        Log.i(TAG, "sosPhone0：" + wl_phone0);
+        Log.i(TAG, "sosPhone1：" + wl_phone1);
+        Log.i(TAG, "sosPhone2：" + wl_phone2);
 
-        //putSOSNumber("number1", "17665136602");
+        //白名单序号1,2,3对应的是sos的号码
+        insertWhiteList(wl_num0, wl_name0, wl_phone0);
+        insertWhiteList(wl_num1, wl_name1, wl_phone1);
+        insertWhiteList(wl_num2, wl_name2, wl_phone2);
+
+
         return "*WT," + serialNum + ",V4" + ",SETSOS," + lastTime + "," + hhmmss +
                 "," + splitMeg[4] + "," + splitMeg[5] + "," + splitMeg[6] +
                 "," + splitMeg[7] + "," + splitMeg[8] + "," + splitMeg[9] +
                 "," + splitMeg[10] + "," + splitMeg[11] + "," + splitMeg[12] +
                 ",V," + latitude + "," + longitude + "," + ddmmyy + ",FDFFFFFF#";
+    }
+
+    /**
+     * 往白名单数据库里面插入数据
+     *
+     * @param wl_num
+     * @param wl_name
+     * @param wl_phone
+     */
+    private void insertWhiteList(String wl_num, String wl_name, String wl_phone) {
+        if (null == wl_phone || wl_phone.isEmpty()) {
+            //删除这条数据
+            WhiteListUtil.getInstance(mContext).delete(wl_num);
+        } else {
+            ArrayList<WhiteListEntity> entities = WhiteListUtil.getInstance(mContext).queryAll();
+            entities.stream().forEach(
+                    whiteListEntity -> {
+                        Log.d(TAG, "WhiteListEntity：" + whiteListEntity.toString());
+                        if (wl_num.equals(whiteListEntity.getWl_num())) {
+                            //编号相同的时候避免重复也先删除
+                            WhiteListUtil.getInstance(mContext).delete(wl_num);
+                        }
+                    }
+            );
+            //插入数据，编号，姓名，电话
+            WhiteListUtil.getInstance(mContext).insert(wl_num, wl_name, wl_phone);
+        }
     }
 
     private int call_index = 0;
@@ -552,12 +560,15 @@ public class DeviceResponseUtil {
                         for (WhiteListEntity entity : listEntities) {
                             whitePhoneList.add(entity.getWl_phone());
                         }
-                        if (!whitePhoneList.contains(phoneNumber)) {
-                            //挂断
-                            endCall();
+                        if (whitePhoneList.isEmpty()) {
+                            //白名单没有号码，所有号码都不管
+
+                        } else {
+                            if (!whitePhoneList.contains(phoneNumber)) {
+                                //挂断
+                                endCall();
+                            }
                         }
-
-
                         isIncomcallFlag = true;
                         //mHandler.sendEmptyMessageDelayed(6, 2000L);
                         //输出来电号码
@@ -602,8 +613,6 @@ public class DeviceResponseUtil {
                     //cast to CellInfoLte and call all the CellInfoLte methods you need
                     dbm = ((CellInfoLte) cellInfo).getCellSignalStrength().getDbm();
                     //                    int asu = ((CellInfoLte) cellInfo).getCellSignalStrength().getAsuLevel();
-
-
                     break;
                 }
             }
@@ -656,34 +665,34 @@ public class DeviceResponseUtil {
             tm.endCall();
     }
 
-//    protected boolean endCall() {
-//        boolean ret = false;
-//        // TODO
-//        try {
-//            ITelephony phone =
-//                    ITelephony.Stub.asInterface(ServiceManager.checkService("phone"));
-//            int subId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
-//
-//            for (int i = 0; i < 4; i++) {
-//                int[] subIds = SubscriptionManager.getSubId(i);
-//                if (subIds != null && subIds.length > 0 && subIds[0] != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
-//                    subId = subIds[0];
-//                    Log.i(TAG,"endCall: subId=" + subId + " from phoneId=" + i);
-//                    break;
-//                }
-//            }
-//
-//            if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
-//                ret = phone.endCallForSubscriber(subId);
-//            } else {
-//                Log.i(TAG,"endCall: failed due to no valid subId, stop test directly!");
-//            }
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//        Log.i(TAG,"endCall ret=" + ret);
-//        return ret;
-//    }
+    //    protected boolean endCall() {
+    //        boolean ret = false;
+    //        // TODO
+    //        try {
+    //            ITelephony phone =
+    //                    ITelephony.Stub.asInterface(ServiceManager.checkService("phone"));
+    //            int subId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+    //
+    //            for (int i = 0; i < 4; i++) {
+    //                int[] subIds = SubscriptionManager.getSubId(i);
+    //                if (subIds != null && subIds.length > 0 && subIds[0] != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+    //                    subId = subIds[0];
+    //                    Log.i(TAG,"endCall: subId=" + subId + " from phoneId=" + i);
+    //                    break;
+    //                }
+    //            }
+    //
+    //            if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+    //                ret = phone.endCallForSubscriber(subId);
+    //            } else {
+    //                Log.i(TAG,"endCall: failed due to no valid subId, stop test directly!");
+    //            }
+    //        } catch (Exception e) {
+    //            e.printStackTrace();
+    //        }
+    //        Log.i(TAG,"endCall ret=" + ret);
+    //        return ret;
+    //    }
 
     public static DeviceResponseUtil getInstance(Context context, StudentCardService studentCardService) {
         if (instance == null) {

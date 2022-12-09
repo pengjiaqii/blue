@@ -8,10 +8,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.media.AudioManager;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
@@ -19,20 +17,15 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Process;
 import android.provider.Settings;
-import android.telecom.PhoneAccountHandle;
 import android.telecom.TelecomManager;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
-import androidx.annotation.RequiresApi;
-
 import com.example.demo.db.WhiteListEntity;
 import com.example.demo.db.WhiteListUtil;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 @SuppressLint("LongLogTag")
 public class PowerButtonReceiverService extends Service {
@@ -329,9 +322,28 @@ public class PowerButtonReceiverService extends Service {
     private String[] mNumSos = new String[3];
 
     private void initData() {
-        SharedPreferences sp = getSharedPreferences("sos_info", 0);
-        mNumSos[0] = sp.getString("num1_sos", "17665136602");
-        mNumSos[1] = sp.getString("num2_sos", "17665136602");
-        mNumSos[2] = sp.getString("num3_sos", "17665136602");
+        ArrayList<WhiteListEntity> entities1 = WhiteListUtil.getInstance(this).query("1");
+        ArrayList<WhiteListEntity> entities2 = WhiteListUtil.getInstance(this).query("2");
+        ArrayList<WhiteListEntity> entities3 = WhiteListUtil.getInstance(this).query("3");
+        Log.d(TAG, "entities1===>"+entities1.size());
+        if (!entities1.isEmpty()) {
+            String wl_phone1 = entities1.get(0).getWl_phone();
+            Log.d(TAG, "wl_phone1===>"+wl_phone1);
+            mNumSos[0] = wl_phone1;
+        }
+        Log.d(TAG, "entities2===>"+entities2.size());
+        if (!entities2.isEmpty()) {
+            String wl_phone2 = entities2.get(0).getWl_phone();
+            Log.d(TAG, "wl_phone2===>"+wl_phone2);
+            mNumSos[1] = wl_phone2;
+        }
+        Log.d(TAG, "entities3===>"+entities3.size());
+        if (!entities3.isEmpty()) {
+            String wl_phone3 = entities3.get(0).getWl_phone();
+            Log.d(TAG, "wl_phone3===>"+wl_phone3);
+            mNumSos[2] = wl_phone3;
+        }
+
+
     }
 }

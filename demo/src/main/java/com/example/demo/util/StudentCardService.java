@@ -29,6 +29,10 @@ public class StudentCardService extends Service {
      */
     private static final long HEART_BEAT_RATE = 60 * 1000;
     /**
+     * 重试机制
+     */
+    private static final long RETRY_INIT = 10 * 1000;
+    /**
      * 主机IP地址
      */
     private static final String HOST = "192.168.12.98";
@@ -128,6 +132,20 @@ public class StudentCardService extends Service {
         }
     };
 
+    private Runnable retryInitRunnable = new Runnable() {
+        @Override
+        public void run() {
+            Log.d(TAG, "TcpService：重试init");
+            if (null == mSocket || null == mSocket.get() || !mSocket.get().isConnected()) {
+                releaseLastSocket(mSocket);
+                new InitSocketThread().start();
+            }else {
+                mHandler.removeCallbacks(retryInitRunnable);
+            }
+        }
+    };
+
+
     public void sendMsg(String msg) {
         Log.i(TAG, "TcpService：sendMsg:" + msg);
         if (null == mSocket || null == mSocket.get() || !mSocket.get().isConnected()) {
@@ -154,7 +172,7 @@ public class StudentCardService extends Service {
             sendMsg(v2Signal);
         }
         // 初始化成功后，就准备发送心跳包
-        mHandler.postDelayed(heartBeatRunnable, HEART_BEAT_RATE);
+        mHandler.post(heartBeatRunnable);
     }
 
     // 释放socket
@@ -221,6 +239,8 @@ public class StudentCardService extends Service {
             } catch (Exception e) {
                 e.printStackTrace();
                 Log.e(TAG, "TcpService：initSocket Exception：" + e);
+                Log.e(TAG, "初始化异常了,开始重启：" + e.getMessage());
+                mHandler.postDelayed(retryInitRunnable,RETRY_INIT);
             }
         }
     }
@@ -292,52 +312,4 @@ public class StudentCardService extends Service {
         }
     }
 
-    //    @SuppressLint("MissingPermission")
-    //    private void getLocation() {
-    //        //1.获取位置管理器
-    //        LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
-    //        // 查找到服务信息
-    //        Criteria criteria = new Criteria();
-    //        criteria.setAccuracy(Criteria.ACCURACY_FINE); // 高精度
-    //
-    //        criteria.setAltitudeRequired(false);
-    //        criteria.setBearingRequired(false);
-    //        criteria.setCostAllowed(true);
-    //        criteria.setPowerRequirement(Criteria.POWER_LOW); // 低功耗
-    //
-    //        String locationProvider = locationManager.getBestProvider(criteria, true);// 获取GPS信息
-    //
-    //        Location location = locationManager.getLastKnownLocation(locationProvider);// 通过GPS获取位置
-    //
-    //        latitude = location.getLatitude();//纬度
-    //        longitude = location.getLongitude();//经度
-    //        Log.i(TAG, "location.latitude: " + latitude);
-    //        Log.i(TAG, "location.longitude:  " + longitude);
-    //
-    //        // 设置每2秒获取一次GPS的定位信息
-    //        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 8f, new LocationListener() {
-    //            // Provider的状态在可用、暂时不可用和无服务三个状态直接切换时触发此函数
-    //            @Override
-    //            public void onStatusChanged(String provider, int status, Bundle arg2) {
-    //            }
-    //
-    //            // Provider被enable时触发此函数，比如GPS被打开
-    //            @Override
-    //            public void onProviderEnabled(String provider) {
-    //            }
-    //
-    //            // Provider被disable时触发此函数，比如GPS被关闭
-    //            @Override
-    //            public void onProviderDisabled(String provider) {
-    //            }
-    //
-    //            //当坐标改变时触发此函数，如果Provider传进相同的坐标，它就不会被触发
-    //            @Override
-    //            public void onLocationChanged(Location loc) {
-    //                Log.i(TAG, "onLocationChanged");
-    //                //            location = loc;
-    //                //            showLocation();
-    //            }
-    //        });
-    //    }
 }
