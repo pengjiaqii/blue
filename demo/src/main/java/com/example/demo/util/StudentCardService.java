@@ -39,7 +39,7 @@ public class StudentCardService extends Service {
     /**
      * 端口号
      */
-    public static final int PORT = 8081;
+    public static final int PORT = 8082;
 
     private long sendTime = 0L;
 
@@ -139,7 +139,7 @@ public class StudentCardService extends Service {
             if (null == mSocket || null == mSocket.get() || !mSocket.get().isConnected()) {
                 releaseLastSocket(mSocket);
                 new InitSocketThread().start();
-            }else {
+            } else {
                 mHandler.removeCallbacks(retryInitRunnable);
             }
         }
@@ -162,6 +162,8 @@ public class StudentCardService extends Service {
     // 初始化socket
     private void initSocket() throws UnknownHostException, IOException {
         Log.d(TAG, "TcpService：initSocket");
+        Log.d(TAG, "TcpService：initSocket:HOST:" + HOST);
+        Log.d(TAG, "TcpService：initSocket:PORT:" + PORT);
         Socket socket = new Socket(HOST, PORT);
         socket.setKeepAlive(true);
         mSocket = new WeakReference<Socket>(socket);
@@ -185,8 +187,10 @@ public class StudentCardService extends Service {
                     sk.close();
                     sk = null;
                 }
-                mSocket.clear();
-                mSocket = null;
+                if (mSocket != null) {
+                    mSocket.clear();
+                    mSocket = null;
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -240,7 +244,7 @@ public class StudentCardService extends Service {
                 e.printStackTrace();
                 Log.e(TAG, "TcpService：initSocket Exception：" + e);
                 Log.e(TAG, "初始化异常了,开始重启：" + e.getMessage());
-                mHandler.postDelayed(retryInitRunnable,RETRY_INIT);
+                mHandler.postDelayed(retryInitRunnable, RETRY_INIT);
             }
         }
     }

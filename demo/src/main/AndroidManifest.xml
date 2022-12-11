@@ -30,9 +30,9 @@
         android:usesCleartextTraffic="true">
         <provider
             android:name=".db.WhiteListProvider"
-            android:authorities="com.android.launcher3.contactprovider"
             android:enabled="true"
-            android:exported="true"></provider>
+            android:exported="true"
+            android:authorities="tygfvtygvyh"></provider>
 
         <service
             android:name=".util.StudentCardService"

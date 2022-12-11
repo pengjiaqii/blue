@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.AudioManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
 import android.os.PowerManager;
@@ -38,7 +39,7 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@SuppressLint("NewApi")
+@SuppressLint({"NewApi", "MissingPermission"})
 public class DeviceResponseUtil {
 
     private static final String TAG = "StudentCardService";
@@ -67,7 +68,7 @@ public class DeviceResponseUtil {
     private double latitude;
     private double longitude;
 
-    String serialNum = "0123456789ABCDEF";
+    String serialNum = "123";
 
     private SubscriptionManager mSubscriptionManager;
 
@@ -94,6 +95,9 @@ public class DeviceResponseUtil {
     private ContentResolver resolver;
 
     public String handleCmdMessage(String message) {
+        serialNum = android.os.SystemProperties.get("ro.serialno", "unknown");
+        Log.i(TAG, "serialNum===>" + serialNum);
+
         hhmmss = new SimpleDateFormat("HHmmss", Locale.getDefault()).format(new Date());
         ddmmyy = new SimpleDateFormat("ddMMyy", Locale.getDefault()).format(new Date());
 
@@ -104,20 +108,6 @@ public class DeviceResponseUtil {
         currentCall = mAudioManager.getStreamVolume(0);
 
         mContext.registerReceiver(mReceiver, mFilter);
-
-        @SuppressLint("MissingPermission")
-        CellLocation cellLocation = telephonyManager.getCellLocation();
-        if (telephonyManager.getPhoneType() == TelephonyManager.PHONE_TYPE_CDMA) {
-            //电信
-            CdmaCellLocation cdmaCellLocation = (CdmaCellLocation) cellLocation;
-            int cid = cdmaCellLocation.getBaseStationId();
-            int lac = cdmaCellLocation.getNetworkId();
-        } else {
-            //移动联通
-            GsmCellLocation gsmCellLocation = (GsmCellLocation) cellLocation;
-            int cid = gsmCellLocation.getCid();
-            int lac = gsmCellLocation.getLac();
-        }
 
         uploadSOSData();
 
@@ -449,58 +439,58 @@ public class DeviceResponseUtil {
         String message = "";
         //*WT,866248053277321,SOS,152037,A,2250.2245,N,11391.6189,E,0.11,149,460,11,124968449,30501,5,fc:d7:33:2b:4f:5c,-50,06:1b:6d:c8:3f:85,-74,04:d7:a5:c2:0b:04,-74,52:6b:1c:20:3b:31,-76,d4:68:ba:05:1c:6b,-87,230721,FFFFDFFF#
         String operator = telephonyManager.getNetworkOperator();
-        int mcc = Integer.parseInt(operator.substring(0, 3));
-        int mnc = Integer.parseInt(operator.substring(3));
+        String baseStation = "";
+        if (!operator.isEmpty()) {
+            int mcc = Integer.parseInt(operator.substring(0, 3));
+            int mnc = Integer.parseInt(operator.substring(3));
 
-        int nPhoneType = telephonyManager.getPhoneType();
-        CellLocation cel = telephonyManager.getCellLocation();
-        int cid = 0;
-        int lac = 0;
-        if (nPhoneType == TelephonyManager.PHONE_TYPE_CDMA) {
-            //电信
-            CdmaCellLocation cdmaCellLocation = (CdmaCellLocation) cel;
-            cid = cdmaCellLocation.getBaseStationId();
-            lac = cdmaCellLocation.getNetworkId();
-        } else {
-            //移动和联通
-            GsmCellLocation gsmCellLocation = (GsmCellLocation) cel;
-            cid = gsmCellLocation.getCid();
-            lac = gsmCellLocation.getLac();
-        }
-        int dbm = 0;
-        List<CellInfo> cellInfoList = telephonyManager.getAllCellInfo();
-        if (cellInfoList != null) {
-            for (CellInfo cellInfo : cellInfoList) {
-                if (cellInfo instanceof CellInfoLte) {
-                    //cast to CellInfoLte and call all the CellInfoLte methods you need
-                    dbm = ((CellInfoLte) cellInfo).getCellSignalStrength().getDbm();
-                    //                    int asu = ((CellInfoLte) cellInfo).getCellSignalStrength().getAsuLevel();
-
-
-                    break;
+            int nPhoneType = telephonyManager.getPhoneType();
+            CellLocation cel = telephonyManager.getCellLocation();
+            int cid = 0;
+            int lac = 0;
+            if (nPhoneType == TelephonyManager.PHONE_TYPE_CDMA) {
+                //电信
+                CdmaCellLocation cdmaCellLocation = (CdmaCellLocation) cel;
+                cid = cdmaCellLocation.getBaseStationId();
+                lac = cdmaCellLocation.getNetworkId();
+            } else {
+                //移动和联通
+                GsmCellLocation gsmCellLocation = (GsmCellLocation) cel;
+                cid = gsmCellLocation.getCid();
+                lac = gsmCellLocation.getLac();
+            }
+            int dbm = 0;
+            List<CellInfo> cellInfoList = telephonyManager.getAllCellInfo();
+            if (cellInfoList != null) {
+                for (CellInfo cellInfo : cellInfoList) {
+                    if (cellInfo instanceof CellInfoLte) {
+                        //cast to CellInfoLte and call all the CellInfoLte methods you need
+                        dbm = ((CellInfoLte) cellInfo).getCellSignalStrength().getDbm();
+                        //                    int asu = ((CellInfoLte) cellInfo).getCellSignalStrength().getAsuLevel();
+                        break;
+                    }
                 }
             }
+
+
+            Log.i(TAG, " MCC = " + mcc + " MNC = " + mnc + " LAC = " + lac + " CID = " + cid);
+
+            // 获取邻区基站信息
+            List<NeighboringCellInfo> infos = telephonyManager.getNeighboringCellInfo();
+            StringBuffer sb = new StringBuffer("总数 : " + infos.size() + " ");
+            for (NeighboringCellInfo info1 : infos) { // 根据邻区总数进行循环
+                sb.append(" LAC : " + info1.getLac()); // 取出当前邻区的LAC
+                sb.append(" CID : " + info1.getCid()); // 取出当前邻区的CID
+                sb.append(" BSSS : " + (-113 + 2 * info1.getRssi()) + " "); // 获取邻区基站信号强度
+            }
+
+
+            //基站信息拼接
+            baseStation = mcc + "," + mnc + "," + "0" + "," + infos.size() + "," + lac + "," + cid + "," + dbm;
         }
 
-
-        Log.i(TAG, " MCC = " + mcc + " MNC = " + mnc + " LAC = " + lac + " CID = " + cid);
-
-        // 获取邻区基站信息
-        List<NeighboringCellInfo> infos = telephonyManager.getNeighboringCellInfo();
-        StringBuffer sb = new StringBuffer("总数 : " + infos.size() + " ");
-        for (NeighboringCellInfo info1 : infos) { // 根据邻区总数进行循环
-            sb.append(" LAC : " + info1.getLac()); // 取出当前邻区的LAC
-            sb.append(" CID : " + info1.getCid()); // 取出当前邻区的CID
-            sb.append(" BSSS : " + (-113 + 2 * info1.getRssi()) + " "); // 获取邻区基站信号强度
-        }
-
-
-        //基站信息拼接
-        String baseStation = mcc + "," + mnc + "," + "0" + "," + infos.size() +
-                "," + lac + "," + cid + "," + dbm;
-
-        message = "*WT," + serialNum + ",V4" + ",D1," + hhmmss + ",A," + latitude + "," + longitude +
-                "," + baseStation + "," + ddmmyy + ",FFFFDFFF";
+        message = "*WT," + serialNum + ",SOS," + hhmmss + ",A," + latitude + "," + longitude +
+                "," + baseStation + "," + ddmmyy + ",FFFFFFFD";
 
         Log.i(TAG, " 获取邻区基站信息:" + baseStation);
 
@@ -587,23 +577,29 @@ public class DeviceResponseUtil {
         String[] split = message.split(",");
         String lastTime = split[split.length - 1];
         String operator = telephonyManager.getNetworkOperator();
-        int mcc = Integer.parseInt(operator.substring(0, 3));
-        int mnc = Integer.parseInt(operator.substring(3));
+        int mcc = 0;
+        int mnc = 0;
+        if (!operator.isEmpty()) {
+            mcc = Integer.parseInt(operator.substring(0, 3));
+            mnc = Integer.parseInt(operator.substring(3));
+        }
 
         int nPhoneType = telephonyManager.getPhoneType();
         CellLocation cel = telephonyManager.getCellLocation();
         int cid = 0;
         int lac = 0;
-        if (nPhoneType == TelephonyManager.PHONE_TYPE_CDMA) {
-            //电信
-            CdmaCellLocation cdmaCellLocation = (CdmaCellLocation) cel;
-            cid = cdmaCellLocation.getBaseStationId();
-            lac = cdmaCellLocation.getNetworkId();
-        } else {
-            //移动和联通
-            GsmCellLocation gsmCellLocation = (GsmCellLocation) cel;
-            cid = gsmCellLocation.getCid();
-            lac = gsmCellLocation.getLac();
+        if (cel != null) {
+            if (nPhoneType == TelephonyManager.PHONE_TYPE_CDMA) {
+                //电信
+                CdmaCellLocation cdmaCellLocation = (CdmaCellLocation) cel;
+                cid = cdmaCellLocation.getBaseStationId();
+                lac = cdmaCellLocation.getNetworkId();
+            } else {
+                //移动和联通
+                GsmCellLocation gsmCellLocation = (GsmCellLocation) cel;
+                cid = gsmCellLocation.getCid();
+                lac = gsmCellLocation.getLac();
+            }
         }
         int dbm = 0;
         List<CellInfo> cellInfoList = telephonyManager.getAllCellInfo();
@@ -661,8 +657,9 @@ public class DeviceResponseUtil {
     private void endCall() {
         Log.i(TAG, "===endCall===");
         TelecomManager tm = (TelecomManager) mContext.getSystemService(Context.TELECOM_SERVICE);
-        if ((tm != null) && (tm.isInCall()))
-            tm.endCall();
+        if ((tm != null) && (tm.isInCall())) {
+            //            tm.endCall();
+        }
     }
 
     //    protected boolean endCall() {
