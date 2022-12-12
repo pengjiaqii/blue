@@ -68,7 +68,7 @@ public class DeviceResponseUtil {
     private double latitude;
     private double longitude;
 
-    String serialNum = "123";
+    String serialNum = "TEST0123456789ABCDEF";
 
     private SubscriptionManager mSubscriptionManager;
 
@@ -95,8 +95,9 @@ public class DeviceResponseUtil {
     private ContentResolver resolver;
 
     public String handleCmdMessage(String message) {
-        serialNum = android.os.SystemProperties.get("ro.serialno", "unknown");
-        Log.i(TAG, "serialNum===>" + serialNum);
+        //        serialNum = android.os.SystemProperties.get("ro.serialno", "unknown");
+        //        Log.i(TAG, "serialNum===>" + serialNum);
+        LocationUtils.getInstance(mContext).getLocation(mContext);
 
         hhmmss = new SimpleDateFormat("HHmmss", Locale.getDefault()).format(new Date());
         ddmmyy = new SimpleDateFormat("ddMMyy", Locale.getDefault()).format(new Date());
@@ -576,6 +577,7 @@ public class DeviceResponseUtil {
     private String handlePositionMonitorD1(String message) {
         String[] split = message.split(",");
         String lastTime = split[split.length - 1];
+        lastTime.replace("#", "");
         String operator = telephonyManager.getNetworkOperator();
         int mcc = 0;
         int mnc = 0;
@@ -633,8 +635,8 @@ public class DeviceResponseUtil {
 
         Log.i(TAG, " baseStation:" + baseStation.toString());
 
-        return "*WT," + serialNum + ",V4" + ",D1," + lastTime + "," + hhmmss + ",A," + latitude + "," + longitude +
-                "," + baseStation + "," + ddmmyy + ",FDFFFFFF";
+        return "*WT," + serialNum + ",V4" + ",D1," + lastTime + "," + hhmmss + ",A," + latitude + "," + "N" + "," + longitude +
+                "," + "E" + "," + baseStation + "," + ddmmyy + ",FDFFFFFF";
     }
 
     /**

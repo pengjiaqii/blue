@@ -33,12 +33,14 @@ public class StudentCardService extends Service {
      */
     private static final long RETRY_INIT = 10 * 1000;
     /**
-     * 主机IP地址
+     * IP地址
      */
+//    private static final String HOST = "112.74.176.68";
     private static final String HOST = "192.168.12.98";
     /**
      * 端口号
      */
+//    public static final int PORT = 9098;
     public static final int PORT = 8082;
 
     private long sendTime = 0L;

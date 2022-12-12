@@ -9,7 +9,9 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
 
+import java.util.List;
 
+@SuppressLint("MissingPermission")
 public class LocationUtils {
 
     private static volatile LocationUtils instance;
@@ -21,21 +23,12 @@ public class LocationUtils {
         return longitude;
     }
 
-    public void setLongitude(double longitude) {
-        this.longitude = longitude;
-    }
-
     public double getLatitude() {
         return latitude;
     }
 
-    public void setLatitude(double latitude) {
-        this.latitude = latitude;
-    }
-
     private Context mContext;
 
-    @SuppressLint("MissingPermission")
     public final void getLocation(Context context) {
         LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
         if (locationManager == null) {
@@ -48,7 +41,8 @@ public class LocationUtils {
             criteria.setCostAllowed(true);
             criteria.setPowerRequirement(1);
             String locationProvider = locationManager.getBestProvider(criteria, true);
-            Location location = locationManager.getLastKnownLocation(locationProvider);
+//            Location location = locationManager.getLastKnownLocation(locationProvider);
+            Location location = getLastKnownLocation(locationManager);
             if (location != null) {
                 latitude = location.getLatitude();
                 longitude = location.getLongitude();
@@ -56,23 +50,39 @@ public class LocationUtils {
 
             Log.i("TcpService", "location.latitude: " + latitude);
             Log.i("TcpService", "location.longitude:  " + longitude);
-            locationManager.requestLocationUpdates(locationProvider, 2000L, 8.0F, (LocationListener) (new LocationListener() {
-                public void onStatusChanged( String provider, int status,  Bundle arg2) {
+            locationManager.requestLocationUpdates(locationProvider, Integer.MAX_VALUE, 0, (LocationListener) (new LocationListener() {
+                public void onStatusChanged(String provider, int status, Bundle arg2) {
                 }
 
-                public void onProviderEnabled( String provider) {
+                public void onProviderEnabled(String provider) {
                 }
 
-                public void onProviderDisabled( String provider) {
+                public void onProviderDisabled(String provider) {
                 }
 
-                public void onLocationChanged( Location loc) {
+                public void onLocationChanged(Location loc) {
                     Log.i("TcpService", "onLocationChanged");
                     latitude = loc.getLatitude();
                     longitude = loc.getLongitude();
                 }
             }));
         }
+    }
+
+    private Location getLastKnownLocation(LocationManager locationManager) {
+        List<String> providers = locationManager.getProviders(true);
+        Location bestLocation = null;
+        for (String provider : providers) {
+            Location l = locationManager.getLastKnownLocation(provider);
+            if (l == null) {
+                continue;
+            }
+            if (bestLocation == null || l.getAccuracy() < bestLocation.getAccuracy()) {
+                // Found best last known location: %s", l);
+                bestLocation = l;
+            }
+        }
+        return bestLocation;
     }
 
 
