@@ -76,7 +76,7 @@ public class StudentCardService extends Service {
         super.onCreate();
         Log.d(TAG, "TcpService：onCreate");
 
-        LocationUtils.getInstance(this).getLocation(this);
+        LocationUtils.getInstance(this).getLocation();
 
         String hhmmss = new SimpleDateFormat("HHmmss", Locale.getDefault()).format(new Date());
 
@@ -127,7 +127,7 @@ public class StudentCardService extends Service {
                     releaseLastSocket(mSocket);
                     new InitSocketThread().start();
                 } else {
-                    sendMsg("heart_beat");
+                    sendMsg("*WT,868976030203477,V2,151744,92,1,56,0,A,2250.2308,N,11391.6231,E,0.11,237,170721,FFFFDFFF#");
                 }
             }
             mHandler.postDelayed(this, HEART_BEAT_RATE);

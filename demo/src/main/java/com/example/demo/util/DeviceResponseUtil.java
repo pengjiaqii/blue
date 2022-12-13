@@ -8,8 +8,17 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.media.AudioManager;
 import android.net.Uri;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
@@ -20,6 +29,7 @@ import android.telephony.CellInfoLte;
 import android.telephony.CellLocation;
 import android.telephony.NeighboringCellInfo;
 import android.telephony.PhoneStateListener;
+import android.telephony.SignalStrength;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
@@ -58,6 +68,8 @@ public class DeviceResponseUtil {
     private final TelephonyManager telephonyManager;
     private final AudioManager mAudioManager;
     private final StudentCardService mService;
+    private final SensorManager mSensorManager;
+    private final BatteryManager batteryManager;
     private Context mContext;
 
     private ContentResolver mResolver;
@@ -94,10 +106,18 @@ public class DeviceResponseUtil {
     IntentFilter mFilter = new IntentFilter("telephony.callacvive.screenoff");
     private ContentResolver resolver;
 
+    private int lastSignal;
+    private float steps;
+
     public String handleCmdMessage(String message) {
-        //        serialNum = android.os.SystemProperties.get("ro.serialno", "unknown");
+        //        serialNum = SystemProperties.get("ro.serialno", "0123456789ABCDEF");
         //        Log.i(TAG, "serialNum===>" + serialNum);
-        LocationUtils.getInstance(mContext).getLocation(mContext);
+        //        String android_id=android.provider.Settings.System.getString(mContext.getContentResolver(), "android_id");
+        //        Log.e(TAG, "android_id===>" + android_id);
+        //        String barcode = SystemProperties.get("gsm.serial","barcode");
+        //        Log.i(TAG, "barcode===>" + barcode);
+
+        LocationUtils.getInstance(mContext).getLocation();
 
         hhmmss = new SimpleDateFormat("HHmmss", Locale.getDefault()).format(new Date());
         ddmmyy = new SimpleDateFormat("ddMMyy", Locale.getDefault()).format(new Date());
@@ -110,6 +130,9 @@ public class DeviceResponseUtil {
 
         mContext.registerReceiver(mReceiver, mFilter);
 
+        String deviceId = telephonyManager.getDeviceId();
+        Log.e("IMEI", "deviceId===>" + deviceId);
+
         uploadSOSData();
 
         if (message.contains("WT") && message.contains("SETSOS")) {
@@ -120,11 +143,18 @@ public class DeviceResponseUtil {
             return setAllWhiteListNumber(message);
         } else if (message.contains("WT") && message.contains("D1")) {
             return handlePositionMonitorD1(message);
+        } else if (message.contains("WT") && message.contains("UPLOADAPP")) {
+            return uploadAppInfo(message);
+        } else if (message.contains("WT") && message.contains("UPLOADAPPFILE")) {
+            return uploadAppInfo(message);
+        } else if (message.contains("WT") && message.contains("APPDOWNLOAD")) {
+            return appInstallSwitch(message);
+        } else if (message.contains("WT") && message.contains("APPDISABLE")) {
+            return appDisableSwitch(message);
         } else {
             return "";
         }
     }
-
 
     /**
      * 设置白名单号码
@@ -168,9 +198,11 @@ public class DeviceResponseUtil {
         WhiteListUtil.getInstance(mContext).query(wl_num);
         WhiteListUtil.getInstance(mContext).queryAll();
 
-        return "*WT," + serialNum + ",V4" + ",PBWL," + lastTime + "," + splitMeg[4] + "," + splitMeg[5] +
+        String pbwlReturnMsg = "*WT," + serialNum + ",V4" + ",PBWL," + lastTime + "," + splitMeg[4] + "," + splitMeg[5] +
                 "," + splitMeg[6] + "," + splitMeg[7] + "," + splitMeg[8] + "," + hhmmss + ",V," + latitude +
                 "," + longitude + "," + ddmmyy + ",FFFFFFFD#";
+        Log.i(TAG, " pbwlReturnMsg--->" + pbwlReturnMsg);
+        return pbwlReturnMsg;
     }
 
 
@@ -217,9 +249,13 @@ public class DeviceResponseUtil {
             Log.i(TAG, "WhiteListEntity：" + entity.toString());
         }
 
-        return "*WT," + serialNum + ",V4" + ",PBWLALL," + lastTime + "," + splitMeg[4] + "," + splitMeg[5] +
+        String pbwlAllReturnMsg = "*WT," + serialNum + ",V4" + ",PBWLALL," + lastTime + "," + splitMeg[4] + "," + splitMeg[5] +
                 "," + splitMeg[6] + "," + splitMeg[7] + "," + hhmmss + ",A," + latitude +
                 "," + longitude + "," + ddmmyy + ",FFFFFFFF#";
+
+        Log.i(TAG, " pbwlAllReturnMsg--->" + pbwlAllReturnMsg);
+
+        return pbwlAllReturnMsg;
     }
 
     /**
@@ -259,11 +295,13 @@ public class DeviceResponseUtil {
         insertWhiteList(wl_num2, wl_name2, wl_phone2);
 
 
-        return "*WT," + serialNum + ",V4" + ",SETSOS," + lastTime + "," + hhmmss +
+        String setSOSReturnMsg = "*WT," + serialNum + ",V4" + ",SETSOS," + lastTime + "," + hhmmss +
                 "," + splitMeg[4] + "," + splitMeg[5] + "," + splitMeg[6] +
                 "," + splitMeg[7] + "," + splitMeg[8] + "," + splitMeg[9] +
                 "," + splitMeg[10] + "," + splitMeg[11] + "," + splitMeg[12] +
                 ",V," + latitude + "," + longitude + "," + ddmmyy + ",FDFFFFFF#";
+        Log.i(TAG, " setSOSReturnMeg--->" + setSOSReturnMsg);
+        return setSOSReturnMsg;
     }
 
     /**
@@ -512,6 +550,13 @@ public class DeviceResponseUtil {
         mService = studentCardService;
 
         mAudioManager = (AudioManager) context.getSystemService(Service.AUDIO_SERVICE);
+        mSensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
+        MySensorEventListener mListener = new MySensorEventListener();
+        mSensorManager.registerListener(mListener, mSensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER),
+                SensorManager.SENSOR_DELAY_NORMAL);
+
+        batteryManager = (BatteryManager) context.getSystemService(Context.BATTERY_SERVICE);
+
         telephonyManager = (TelephonyManager) context.getSystemService(Service.TELEPHONY_SERVICE);
         telephonyManager.listen(new PhoneStateListener() {
             @Override
@@ -576,8 +621,8 @@ public class DeviceResponseUtil {
      */
     private String handlePositionMonitorD1(String message) {
         String[] split = message.split(",");
-        String lastTime = split[split.length - 1];
-        lastTime.replace("#", "");
+        String splitRes = split[split.length - 1];
+        String lastTime = splitRes.replace("#", "");
         String operator = telephonyManager.getNetworkOperator();
         int mcc = 0;
         int mnc = 0;
@@ -628,15 +673,28 @@ public class DeviceResponseUtil {
             sb.append(" BSSS : " + (-113 + 2 * info1.getRssi()) + " "); // 获取邻区基站信号强度
         }
 
+        telephonyManager.listen(new PhoneStateListener() {
+            @Override
+            public void onSignalStrengthsChanged(SignalStrength signalStrength) {
+                super.onSignalStrengthsChanged(signalStrength);
+                int asu = signalStrength.getGsmSignalStrength();
+                lastSignal = -113 + 2 * asu;
+            }
+        }, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+
 
         //基站信息拼接
         String baseStation = mcc + "," + mnc + "," + "0" + "," + infos.size() +
-                "," + lac + "," + cid + "," + dbm;
+                "," + lac + "," + cid + "," + dbm + "," + lastSignal;
 
-        Log.i(TAG, " baseStation:" + baseStation.toString());
+        //电量
+        int intBattery = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
 
-        return "*WT," + serialNum + ",V4" + ",D1," + lastTime + "," + hhmmss + ",A," + latitude + "," + "N" + "," + longitude +
-                "," + "E" + "," + baseStation + "," + ddmmyy + ",FDFFFFFF";
+        String d1ReturnMsg = "*WT," + serialNum + ",V4" + ",D1," + lastTime + "," + hhmmss + ",A," + latitude + "," + longitude +
+                "," + baseStation + "," + steps + "," + intBattery + "," + ddmmyy + ",FDFFFFFF#";
+        Log.i(TAG, " d1ReturnMsg--->" + d1ReturnMsg);
+
+        return d1ReturnMsg;
     }
 
     /**
@@ -663,6 +721,56 @@ public class DeviceResponseUtil {
             //            tm.endCall();
         }
     }
+
+    /**
+     * 获取应用信息 并上传
+     *
+     * @param message
+     * @return
+     */
+    private String uploadAppInfo(String message) {
+        //*WT,imei,UPLOADAPP,HHMMSS,groupNum,appName,package,DATE,STATUS#
+        getPackageAppInfo();
+
+        return null;
+    }
+
+    /**
+     * 指令关键字：APPDOWNLOAD
+     * Switch:0-关闭 1-打开；
+     */
+    private String appInstallSwitch(String message) {
+        //*WT,IMEI,APPDOWNLOAD,seq,switch,date,tracker_status#
+        String[] split = message.split(",");
+        String appInstallSwitch = split[4];
+        if ("0".equals(appInstallSwitch)) {
+            SystemProperties.set("persist.sys.enableinstall", "0");
+        } else if ("1".equals(appInstallSwitch)) {
+            SystemProperties.set("persist.sys.enableinstall", "1");
+        }
+
+        String installSwitchReturnMsg = "*WT," + serialNum + "," + "APPDOWNLOAD" + "," + "seq" + "," + appInstallSwitch + "," + ddmmyy;
+        Log.i(TAG, " installSwitchReturnMsg--->" + installSwitchReturnMsg);
+        return installSwitchReturnMsg;
+    }
+
+    /**
+     * 指令关键字：APPDISABLE
+     * Switch:0-关闭 1-打开(打开app禁用，则禁止所有时间段内禁用,关闭禁用,则可限制使用时间)
+     */
+    private String appDisableSwitch(String message) {
+        //*WT,IMEI,APPDISABLE,seq,package,switch,groupNum,stratTime,endTime,cycle#
+        String[] split = message.split(",");
+        String appDisableSwitch = split[5];
+        if ("0".equals(appDisableSwitch)) {
+            SystemProperties.set("persist.sys.enablestartapp", "0");
+        } else if ("1".equals(appDisableSwitch)) {
+            SystemProperties.set("persist.sys.enablestartapp", "1");
+        }
+
+        return null;
+    }
+
 
     //    protected boolean endCall() {
     //        boolean ret = false;
@@ -692,6 +800,54 @@ public class DeviceResponseUtil {
     //        Log.i(TAG,"endCall ret=" + ret);
     //        return ret;
     //    }
+
+    /**
+     * 获取所有应用信息
+     *
+     * @return
+     */
+    private List<PackageInfo> getPackageAppInfo() {
+        PackageManager pm = mContext.getPackageManager();
+        @SuppressLint("WrongConstant")
+        List<PackageInfo> installList = pm.getInstalledPackages(PackageManager.PERMISSION_GRANTED);
+        Log.d("PackageInfo", "install_app_size--->" + installList.size());
+        for (int i = 0; i < installList.size(); i++) {
+            PackageInfo item = installList.get(i);
+            try {
+                String appName = item.applicationInfo.loadLabel(pm).toString();
+                String packageName = item.packageName;
+                String versionName = item.versionName;
+                Drawable appIcon = item.applicationInfo.loadIcon(pm);
+
+                Log.d("PackageInfo", "appName===>" + appName + "===packageName===>" + packageName + "===appIcon===>" + appIcon);
+            } catch (Exception e) {
+                e.printStackTrace();
+                continue;
+            }
+        }
+
+        return installList;
+    }
+
+
+    private boolean isSystemApp(PackageInfo pi) {
+        boolean isSysApp = (pi.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 1;
+        boolean isSysUpd = (pi.applicationInfo.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 1;
+        return isSysApp || isSysUpd;
+    }
+
+    private class MySensorEventListener implements SensorEventListener {
+        @Override
+        public void onSensorChanged(SensorEvent event) {
+            steps = event.values[0];
+            Log.i(TAG, "您今天走了:" + steps);
+        }
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        }
+    }
+
 
     public static DeviceResponseUtil getInstance(Context context, StudentCardService studentCardService) {
         if (instance == null) {

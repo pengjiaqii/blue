@@ -14,6 +14,8 @@ import java.util.List;
 @SuppressLint("MissingPermission")
 public class LocationUtils {
 
+    public static final String TAG = "LocationUtils";
+
     private static volatile LocationUtils instance;
 
     private double longitude;
@@ -29,28 +31,29 @@ public class LocationUtils {
 
     private Context mContext;
 
-    public final void getLocation(Context context) {
+    public final void getLocation() {
         LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
         if (locationManager == null) {
             throw new NullPointerException("null cannot be cast to non-null type android.location.LocationManager");
         } else {
             Criteria criteria = new Criteria();
-            criteria.setAccuracy(1);
+            criteria.setAccuracy(Criteria.ACCURACY_COARSE);
             criteria.setAltitudeRequired(false);
             criteria.setBearingRequired(false);
             criteria.setCostAllowed(true);
-            criteria.setPowerRequirement(1);
+            criteria.setPowerRequirement(Criteria.POWER_LOW);
             String locationProvider = locationManager.getBestProvider(criteria, true);
-//            Location location = locationManager.getLastKnownLocation(locationProvider);
-            Location location = getLastKnownLocation(locationManager);
+            Location location = locationManager.getLastKnownLocation(locationProvider);
+            //            Location location = getLastKnownLocation(locationManager);
             if (location != null) {
                 latitude = location.getLatitude();
                 longitude = location.getLongitude();
             }
 
-            Log.i("TcpService", "location.latitude: " + latitude);
-            Log.i("TcpService", "location.longitude:  " + longitude);
-            locationManager.requestLocationUpdates(locationProvider, Integer.MAX_VALUE, 0, (LocationListener) (new LocationListener() {
+            Log.i(TAG, "location.latitude: " + latitude);
+            Log.i(TAG, "location.longitude:  " + longitude);
+            locationManager.requestLocationUpdates(locationProvider, 10000, 1,
+                    (LocationListener) (new LocationListener() {
                 public void onStatusChanged(String provider, int status, Bundle arg2) {
                 }
 
@@ -61,9 +64,11 @@ public class LocationUtils {
                 }
 
                 public void onLocationChanged(Location loc) {
-                    Log.i("TcpService", "onLocationChanged");
+                    Log.i(TAG, "onLocationChanged");
                     latitude = loc.getLatitude();
                     longitude = loc.getLongitude();
+                    Log.d(TAG, "location.latitude: " + latitude);
+                    Log.d(TAG, "location.longitude:  " + longitude);
                 }
             }));
         }
