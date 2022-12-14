@@ -35,12 +35,12 @@ public class StudentCardService extends Service {
     /**
      * IP地址
      */
-//    private static final String HOST = "112.74.176.68";
+    //    private static final String HOST = "112.74.176.68";
     private static final String HOST = "192.168.12.98";
     /**
      * 端口号
      */
-//    public static final int PORT = 9098;
+    //    public static final int PORT = 9098;
     public static final int PORT = 8082;
 
     private long sendTime = 0L;
@@ -69,8 +69,6 @@ public class StudentCardService extends Service {
         return null;
     }
 
-    String v2Signal = "";
-
     @Override
     public void onCreate() {
         super.onCreate();
@@ -90,8 +88,6 @@ public class StudentCardService extends Service {
         longitude = LocationUtils.getInstance(this).getLongitude();
         Log.d(StudentCardService.TAG, "latitude:" + latitude);
         Log.d(StudentCardService.TAG, "longitude:" + longitude);
-
-        v2Signal = "*WT," + serialNum + ",V2," + hhmmss + ",A," + latitude + "," + longitude + "," + ddmmyy + ",FFFFDFFF";
 
         new InitSocketThread().start();
     }
@@ -127,7 +123,10 @@ public class StudentCardService extends Service {
                     releaseLastSocket(mSocket);
                     new InitSocketThread().start();
                 } else {
-                    sendMsg("*WT,868976030203477,V2,151744,92,1,56,0,A,2250.2308,N,11391.6231,E,0.11,237,170721,FFFFDFFF#");
+                    String v2SIGNAL = DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()
+                            , StudentCardService.this).handleCmdMessage("V2SIGNAL");
+                    Log.i(TAG, "heartBeat---v2SIGNAL--->" + v2SIGNAL);
+                    sendMsg(v2SIGNAL);
                 }
             }
             mHandler.postDelayed(this, HEART_BEAT_RATE);
@@ -173,10 +172,16 @@ public class StudentCardService extends Service {
         mReadThread.start();
         //初始化成功之后发一条命令给服务器
         if (null != mSocket && null != mSocket.get() && mSocket.get().isConnected()) {
-            sendMsg(v2Signal);
+            String v2SIGNAL = DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()
+                    , StudentCardService.this).handleCmdMessage("V2SIGNAL");
+            Log.d(TAG, "v2SIGNAL--->" + v2SIGNAL);
         }
         // 初始化成功后，就准备发送心跳包
         mHandler.post(heartBeatRunnable);
+        //连接成功后上报应用数据
+        String appInfoMsg = DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()
+                , StudentCardService.this).handleCmdMessage("*WT,UPLOADAPP,1");
+        sendMsg(appInfoMsg);
     }
 
     // 释放socket

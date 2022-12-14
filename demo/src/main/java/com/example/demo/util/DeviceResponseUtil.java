@@ -19,7 +19,6 @@ import android.hardware.SensorManager;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.BatteryManager;
-import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
 import android.os.PowerManager;
@@ -36,7 +35,6 @@ import android.telephony.TelephonyManager;
 import android.telephony.cdma.CdmaCellLocation;
 import android.telephony.gsm.GsmCellLocation;
 import android.util.Log;
-
 
 import com.example.demo.db.WhiteListEntity;
 import com.example.demo.db.WhiteListUtil;
@@ -133,8 +131,6 @@ public class DeviceResponseUtil {
         String deviceId = telephonyManager.getDeviceId();
         Log.e("IMEI", "deviceId===>" + deviceId);
 
-        uploadSOSData();
-
         if (message.contains("WT") && message.contains("SETSOS")) {
             return setSOSNumber(message);
         } else if (message.contains("WT") && message.contains("PBWL")) {
@@ -151,6 +147,8 @@ public class DeviceResponseUtil {
             return appInstallSwitch(message);
         } else if (message.contains("WT") && message.contains("APPDISABLE")) {
             return appDisableSwitch(message);
+        } else if (message.contains("V2SIGNAL")) {
+            return generateV2signal(message);
         } else {
             return "";
         }
@@ -724,15 +722,24 @@ public class DeviceResponseUtil {
 
     /**
      * 获取应用信息 并上传
+     * *TJ,imei,UPLOADAPP,HHMMSS,type,groupNum,appName,package,DATE,STATUS#
      *
      * @param message
      * @return
      */
     private String uploadAppInfo(String message) {
         //*WT,imei,UPLOADAPP,HHMMSS,groupNum,appName,package,DATE,STATUS#
-        getPackageAppInfo();
+        String[] split = message.split(",");
+        //Type:1:全量上报,2:增加上报,3:删除上报
+        String type = split[split.length - 1];
 
-        return null;
+        List<PackageInfo> packageAppInfo = getPackageAppInfo();
+
+
+        String uploadAppInfoMsg = "*WT," + serialNum + ",UPLOADAPP," + hhmmss + "," + type +
+                "," + ddmmyy + ",FDFFFFFF#";
+        Log.i(TAG, " uploadAppInfoMsg--->" + uploadAppInfoMsg);
+        return uploadAppInfoMsg;
     }
 
     /**
@@ -744,12 +751,13 @@ public class DeviceResponseUtil {
         String[] split = message.split(",");
         String appInstallSwitch = split[4];
         if ("0".equals(appInstallSwitch)) {
-            SystemProperties.set("persist.sys.enableinstall", "0");
+            SystemProperties.set("switch.app.install", "0");
         } else if ("1".equals(appInstallSwitch)) {
-            SystemProperties.set("persist.sys.enableinstall", "1");
+            SystemProperties.set("switch.app.install", "1");
         }
 
-        String installSwitchReturnMsg = "*WT," + serialNum + "," + "APPDOWNLOAD" + "," + "seq" + "," + appInstallSwitch + "," + ddmmyy;
+        String installSwitchReturnMsg = "*WT," + serialNum + "," + "APPDOWNLOAD" + "," + "seq"
+                + "," + appInstallSwitch + "," + ddmmyy + ",FFFDFFFF#";
         Log.i(TAG, " installSwitchReturnMsg--->" + installSwitchReturnMsg);
         return installSwitchReturnMsg;
     }
@@ -763,12 +771,14 @@ public class DeviceResponseUtil {
         String[] split = message.split(",");
         String appDisableSwitch = split[5];
         if ("0".equals(appDisableSwitch)) {
-            SystemProperties.set("persist.sys.enablestartapp", "0");
+            SystemProperties.set("switch.app.start", "0");
         } else if ("1".equals(appDisableSwitch)) {
-            SystemProperties.set("persist.sys.enablestartapp", "1");
+            SystemProperties.set("switch.app.start", "1");
         }
-
-        return null;
+        String disableSwitchReturnMsg = "*WT," + serialNum + "," + "APPDISABLE" + "," + "seq"
+                + "," + appDisableSwitch + "," + ddmmyy + ",FFFDFFFF#";
+        Log.i(TAG, " disableSwitchReturnMsg--->" + disableSwitchReturnMsg);
+        return disableSwitchReturnMsg;
     }
 
 
@@ -818,8 +828,13 @@ public class DeviceResponseUtil {
                 String packageName = item.packageName;
                 String versionName = item.versionName;
                 Drawable appIcon = item.applicationInfo.loadIcon(pm);
-
-                Log.d("PackageInfo", "appName===>" + appName + "===packageName===>" + packageName + "===appIcon===>" + appIcon);
+                if (isSystemApp(item)) {
+                    Log.w("PackageInfo", "系统应用---appName===>" + appName + "===packageName===>" + packageName +
+                            "===appIcon" + "===>" + appIcon);
+                } else {
+                    Log.d("PackageInfo", "非系统应用---appName===>" + appName + "===packageName===>" + packageName +
+                            "===appIcon===>" + appIcon);
+                }
             } catch (Exception e) {
                 e.printStackTrace();
                 continue;
@@ -840,7 +855,7 @@ public class DeviceResponseUtil {
         @Override
         public void onSensorChanged(SensorEvent event) {
             steps = event.values[0];
-            Log.i(TAG, "您今天走了:" + steps);
+            Log.i(TAG, "步数:" + steps);
         }
 
         @Override
@@ -866,4 +881,28 @@ public class DeviceResponseUtil {
         return instance;
     }
 
+
+    /**
+     * 生成v2数据
+     *
+     * @param message *WT,868976030203477,V2,151744,92,1,56,0,A,2250.2308,N,11391.6231,E,0.11,237,170721,FFFFDFFF#
+     * @return
+     */
+    private String generateV2signal(String message) {
+        telephonyManager.listen(new PhoneStateListener() {
+            @Override
+            public void onSignalStrengthsChanged(SignalStrength signalStrength) {
+                super.onSignalStrengthsChanged(signalStrength);
+                int asu = signalStrength.getGsmSignalStrength();
+                lastSignal = -113 + 2 * asu;
+            }
+        }, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+        int gpsCount = LocationUtils.getInstance(mContext).getCurGpsStatus();
+        //电量
+        int intBattery = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+
+        String v2Signal = "*WT," + serialNum + ",V2" + "," + hhmmss + "," + lastSignal + "," + gpsCount + "," + intBattery +
+                "," + steps + ",A, " + latitude + ",N," + longitude + ",E," + "," + ddmmyy + "," + "FDFFFFFF#";
+        return v2Signal;
+    }
 }
