@@ -5,9 +5,12 @@ import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -90,6 +93,8 @@ public class StudentCardService extends Service {
         Log.d(StudentCardService.TAG, "longitude:" + longitude);
 
         new InitSocketThread().start();
+
+        registerAllReceiver();
     }
 
     @Override
@@ -172,16 +177,26 @@ public class StudentCardService extends Service {
         mReadThread.start();
         //初始化成功之后发一条命令给服务器
         if (null != mSocket && null != mSocket.get() && mSocket.get().isConnected()) {
-            String v2SIGNAL = DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()
-                    , StudentCardService.this).handleCmdMessage("V2SIGNAL");
-            Log.d(TAG, "v2SIGNAL--->" + v2SIGNAL);
+            mHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    String v2SIGNAL = DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()
+                            , StudentCardService.this).handleCmdMessage("V2SIGNAL");
+                    Log.d(TAG, "v2SIGNAL--->" + v2SIGNAL);
+                }
+            });
+
         }
         // 初始化成功后，就准备发送心跳包
         mHandler.post(heartBeatRunnable);
         //连接成功后上报应用数据
-        String appInfoMsg = DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()
-                , StudentCardService.this).handleCmdMessage("*WT,UPLOADAPP,1");
-        sendMsg(appInfoMsg);
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()
+                        , StudentCardService.this).uploadAppInfo(1);
+            }
+        });
     }
 
     // 释放socket
@@ -305,7 +320,28 @@ public class StudentCardService extends Service {
         }
     }
 
+    private void registerAllReceiver() {
+        //上报sos数据
+        MyReceiver myReceiver = new MyReceiver();
+        IntentFilter filter1 = new IntentFilter();
+        filter1.addAction("com.studentcard.tcp.broadcast");
+        this.registerReceiver(myReceiver, filter1);
+
+        //应用安装卸载数据上传
+        AppReceiver appReceiver = new AppReceiver();
+        IntentFilter filter2 = new IntentFilter();
+        filter2.addAction(Intent.ACTION_PACKAGE_ADDED);
+        filter2.addAction(Intent.ACTION_PACKAGE_REPLACED);
+        filter2.addAction(Intent.ACTION_PACKAGE_REMOVED);
+        filter2.addDataScheme("package");
+        this.registerReceiver(appReceiver, filter2);
+
+    }
+
     public class MyReceiver extends BroadcastReceiver {
+        public MyReceiver() {
+        }
+
         @Override
         public void onReceive(Context context, Intent intent) {
             Log.d(TAG, "收到广播：" + intent.getAction());
@@ -319,6 +355,37 @@ public class StudentCardService extends Service {
                     }
                     Toast.makeText(context, "成功接收广播：" + text, Toast.LENGTH_LONG).show();
                 }
+            }
+        }
+    }
+
+
+    public class AppReceiver extends BroadcastReceiver {
+        public AppReceiver() {
+        }
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (TextUtils.equals(intent.getAction(), Intent.ACTION_PACKAGE_ADDED)) {
+                String packageName = intent.getData().getSchemeSpecificPart();
+                String dataString = intent.get();
+                Log.d(TAG, "----安装成功packageName:" + packageName);
+                Log.d(TAG, "----安装成功dataString:" + dataString);
+                String returnUploadAppInfo = DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()
+                        , StudentCardService.this).uploadAppInfo(2);
+                sendMsg(returnUploadAppInfo);
+                Toast.makeText(context, "安装成功" + packageName, Toast.LENGTH_LONG).show();
+            } else if (TextUtils.equals(intent.getAction(), Intent.ACTION_PACKAGE_REPLACED)) {
+                String packageName = intent.getData().getSchemeSpecificPart();
+                Log.d(TAG, "----替换成功" + packageName);
+                Toast.makeText(context, "替换成功" + packageName, Toast.LENGTH_LONG).show();
+            } else if (TextUtils.equals(intent.getAction(), Intent.ACTION_PACKAGE_REMOVED)) {
+                String packageName = intent.getData().getSchemeSpecificPart();
+                Log.d(TAG, "----卸载成功" + packageName);
+                String returnUploadAppInfo = DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext(),
+                                StudentCardService.this).uploadAppInfo(3);
+                sendMsg(returnUploadAppInfo);
+                Toast.makeText(context, "卸载成功" + packageName, Toast.LENGTH_LONG).show();
             }
         }
     }

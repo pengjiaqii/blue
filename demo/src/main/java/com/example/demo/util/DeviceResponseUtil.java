@@ -108,8 +108,8 @@ public class DeviceResponseUtil {
     private float steps;
 
     public String handleCmdMessage(String message) {
-        //        serialNum = SystemProperties.get("ro.serialno", "0123456789ABCDEF");
-        //        Log.i(TAG, "serialNum===>" + serialNum);
+        serialNum = SystemProperties.get("ro.serialno", "0123456789ABCDEF");
+        Log.i(TAG, "serialNum===>" + serialNum);
         //        String android_id=android.provider.Settings.System.getString(mContext.getContentResolver(), "android_id");
         //        Log.e(TAG, "android_id===>" + android_id);
         //        String barcode = SystemProperties.get("gsm.serial","barcode");
@@ -139,10 +139,6 @@ public class DeviceResponseUtil {
             return setAllWhiteListNumber(message);
         } else if (message.contains("WT") && message.contains("D1")) {
             return handlePositionMonitorD1(message);
-        } else if (message.contains("WT") && message.contains("UPLOADAPP")) {
-            return uploadAppInfo(message);
-        } else if (message.contains("WT") && message.contains("UPLOADAPPFILE")) {
-            return uploadAppInfo(message);
         } else if (message.contains("WT") && message.contains("APPDOWNLOAD")) {
             return appInstallSwitch(message);
         } else if (message.contains("WT") && message.contains("APPDISABLE")) {
@@ -472,70 +468,6 @@ public class DeviceResponseUtil {
     }
 
     @SuppressLint("MissingPermission")
-    public void uploadSOSData() {
-        String message = "";
-        //*WT,866248053277321,SOS,152037,A,2250.2245,N,11391.6189,E,0.11,149,460,11,124968449,30501,5,fc:d7:33:2b:4f:5c,-50,06:1b:6d:c8:3f:85,-74,04:d7:a5:c2:0b:04,-74,52:6b:1c:20:3b:31,-76,d4:68:ba:05:1c:6b,-87,230721,FFFFDFFF#
-        String operator = telephonyManager.getNetworkOperator();
-        String baseStation = "";
-        if (!operator.isEmpty()) {
-            int mcc = Integer.parseInt(operator.substring(0, 3));
-            int mnc = Integer.parseInt(operator.substring(3));
-
-            int nPhoneType = telephonyManager.getPhoneType();
-            CellLocation cel = telephonyManager.getCellLocation();
-            int cid = 0;
-            int lac = 0;
-            if (nPhoneType == TelephonyManager.PHONE_TYPE_CDMA) {
-                //电信
-                CdmaCellLocation cdmaCellLocation = (CdmaCellLocation) cel;
-                cid = cdmaCellLocation.getBaseStationId();
-                lac = cdmaCellLocation.getNetworkId();
-            } else {
-                //移动和联通
-                GsmCellLocation gsmCellLocation = (GsmCellLocation) cel;
-                cid = gsmCellLocation.getCid();
-                lac = gsmCellLocation.getLac();
-            }
-            int dbm = 0;
-            List<CellInfo> cellInfoList = telephonyManager.getAllCellInfo();
-            if (cellInfoList != null) {
-                for (CellInfo cellInfo : cellInfoList) {
-                    if (cellInfo instanceof CellInfoLte) {
-                        //cast to CellInfoLte and call all the CellInfoLte methods you need
-                        dbm = ((CellInfoLte) cellInfo).getCellSignalStrength().getDbm();
-                        //                    int asu = ((CellInfoLte) cellInfo).getCellSignalStrength().getAsuLevel();
-                        break;
-                    }
-                }
-            }
-
-
-            Log.i(TAG, " MCC = " + mcc + " MNC = " + mnc + " LAC = " + lac + " CID = " + cid);
-
-            // 获取邻区基站信息
-            List<NeighboringCellInfo> infos = telephonyManager.getNeighboringCellInfo();
-            StringBuffer sb = new StringBuffer("总数 : " + infos.size() + " ");
-            for (NeighboringCellInfo info1 : infos) { // 根据邻区总数进行循环
-                sb.append(" LAC : " + info1.getLac()); // 取出当前邻区的LAC
-                sb.append(" CID : " + info1.getCid()); // 取出当前邻区的CID
-                sb.append(" BSSS : " + (-113 + 2 * info1.getRssi()) + " "); // 获取邻区基站信号强度
-            }
-
-
-            //基站信息拼接
-            baseStation = mcc + "," + mnc + "," + "0" + "," + infos.size() + "," + lac + "," + cid + "," + dbm;
-        }
-
-        message = "*WT," + serialNum + ",SOS," + hhmmss + ",A," + latitude + "," + longitude +
-                "," + baseStation + "," + ddmmyy + ",FFFFFFFD";
-
-        Log.i(TAG, " 获取邻区基站信息:" + baseStation);
-
-        mService.sendMsg(message);
-    }
-
-
-    @SuppressLint("MissingPermission")
     private DeviceResponseUtil(Context context, StudentCardService studentCardService) {
         //获取一些基本信息
 
@@ -716,22 +648,84 @@ public class DeviceResponseUtil {
         Log.i(TAG, "===endCall===");
         TelecomManager tm = (TelecomManager) mContext.getSystemService(Context.TELECOM_SERVICE);
         if ((tm != null) && (tm.isInCall())) {
-            //            tm.endCall();
+            tm.endCall();
         }
     }
 
     /**
+     * 触发sos的时候，上传sos数据
+     */
+    @SuppressLint("MissingPermission")
+    public void uploadSOSData() {
+        String message = "";
+        //*WT,866248053277321,SOS,152037,A,2250.2245,N,11391.6189,E,0.11,149,460,11,124968449,30501,5,fc:d7:33:2b:4f:5c,-50,06:1b:6d:c8:3f:85,-74,04:d7:a5:c2:0b:04,-74,52:6b:1c:20:3b:31,-76,d4:68:ba:05:1c:6b,-87,230721,FFFFDFFF#
+        String operator = telephonyManager.getNetworkOperator();
+        String baseStation = "";
+        if (!operator.isEmpty()) {
+            int mcc = Integer.parseInt(operator.substring(0, 3));
+            int mnc = Integer.parseInt(operator.substring(3));
+
+            int nPhoneType = telephonyManager.getPhoneType();
+            CellLocation cel = telephonyManager.getCellLocation();
+            int cid = 0;
+            int lac = 0;
+            if (nPhoneType == TelephonyManager.PHONE_TYPE_CDMA) {
+                //电信
+                CdmaCellLocation cdmaCellLocation = (CdmaCellLocation) cel;
+                cid = cdmaCellLocation.getBaseStationId();
+                lac = cdmaCellLocation.getNetworkId();
+            } else {
+                //移动和联通
+                GsmCellLocation gsmCellLocation = (GsmCellLocation) cel;
+                cid = gsmCellLocation.getCid();
+                lac = gsmCellLocation.getLac();
+            }
+            int dbm = 0;
+            List<CellInfo> cellInfoList = telephonyManager.getAllCellInfo();
+            if (cellInfoList != null) {
+                for (CellInfo cellInfo : cellInfoList) {
+                    if (cellInfo instanceof CellInfoLte) {
+                        //cast to CellInfoLte and call all the CellInfoLte methods you need
+                        dbm = ((CellInfoLte) cellInfo).getCellSignalStrength().getDbm();
+                        //                    int asu = ((CellInfoLte) cellInfo).getCellSignalStrength().getAsuLevel();
+                        break;
+                    }
+                }
+            }
+
+
+            Log.i(TAG, " MCC = " + mcc + " MNC = " + mnc + " LAC = " + lac + " CID = " + cid);
+
+            // 获取邻区基站信息
+            List<NeighboringCellInfo> infos = telephonyManager.getNeighboringCellInfo();
+            StringBuffer sb = new StringBuffer("总数 : " + infos.size() + " ");
+            for (NeighboringCellInfo info1 : infos) { // 根据邻区总数进行循环
+                sb.append(" LAC : " + info1.getLac()); // 取出当前邻区的LAC
+                sb.append(" CID : " + info1.getCid()); // 取出当前邻区的CID
+                sb.append(" BSSS : " + (-113 + 2 * info1.getRssi()) + " "); // 获取邻区基站信号强度
+            }
+
+
+            //基站信息拼接
+            baseStation = mcc + "," + mnc + "," + "0" + "," + infos.size() + "," + lac + "," + cid + "," + dbm;
+        }
+
+        message = "*WT," + serialNum + ",SOS," + hhmmss + ",A," + latitude + "," + longitude +
+                "," + baseStation + "," + ddmmyy + ",FFFFFFFD";
+
+        Log.i(TAG, " 获取邻区基站信息:" + baseStation);
+
+        mService.sendMsg(message);
+    }
+
+    /**
      * 获取应用信息 并上传
-     * *TJ,imei,UPLOADAPP,HHMMSS,type,groupNum,appName,package,DATE,STATUS#
-     *
-     * @param message
+     * *WT,imei,UPLOADAPP,HHMMSS,type,groupNum,appName,package,DATE,STATUS#
+     * @param  :1:全量上报,2:增加上报,3:删除上报
      * @return
      */
-    private String uploadAppInfo(String message) {
-        //*WT,imei,UPLOADAPP,HHMMSS,groupNum,appName,package,DATE,STATUS#
-        String[] split = message.split(",");
-        //Type:1:全量上报,2:增加上报,3:删除上报
-        String type = split[split.length - 1];
+    public String uploadAppInfo(int type) {
+        //*WT,imei,UPLOADAPP,HHMMSS,type,groupNum,appName,package,DATE,STATUS#
 
         List<PackageInfo> packageAppInfo = getPackageAppInfo();
 

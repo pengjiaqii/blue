@@ -28,11 +28,20 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
+        <receiver
+            android:name=".AppReceiver"
+            android:enabled="true"
+            android:exported="true"></receiver>
+        <receiver
+            android:name=".SOSReceiver"
+            android:enabled="true"
+            android:exported="true" />
+
         <provider
             android:name=".db.WhiteListProvider"
+            android:authorities="tygfvtygvyh"
             android:enabled="true"
-            android:exported="true"
-            android:authorities="tygfvtygvyh"></provider>
+            android:exported="true" />
 
         <service
             android:name=".util.StudentCardService"
@@ -47,14 +56,13 @@
             </intent-filter>
         </activity>
 
-        <receiver android:name=".util.StudentCardService$MyReceiver"
+        <receiver
+            android:name=".util.StudentCardService$MyReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="com.studentcard.tcp.broadcast" />
             </intent-filter>
         </receiver>
-
-
     </application>
 
 </manifest>
