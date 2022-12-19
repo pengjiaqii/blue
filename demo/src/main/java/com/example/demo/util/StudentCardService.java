@@ -6,7 +6,11 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -21,8 +25,10 @@ import java.lang.ref.WeakReference;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 public class StudentCardService extends Service {
@@ -157,6 +163,9 @@ public class StudentCardService extends Service {
         if (null == mSocket || null == mSocket.get() || !mSocket.get().isConnected()) {
             return;
         }
+        if(TextUtils.isEmpty(msg)){
+            return;
+        }
         //防止启动多次
         if (sendThread != null) {
             sendThread = null;
@@ -193,8 +202,10 @@ public class StudentCardService extends Service {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()
-                        , StudentCardService.this).uploadAppInfo(1);
+                String returnUploadAppInfo = DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()
+                        , StudentCardService.this).uploadAppInfo(1, getPackageAppInfo());
+                Log.i(TAG, "returnUploadAppInfo--->" + returnUploadAppInfo);
+                sendMsg(returnUploadAppInfo);
             }
         });
     }
@@ -368,26 +379,86 @@ public class StudentCardService extends Service {
         public void onReceive(Context context, Intent intent) {
             if (TextUtils.equals(intent.getAction(), Intent.ACTION_PACKAGE_ADDED)) {
                 String packageName = intent.getData().getSchemeSpecificPart();
-                String dataString = intent.get();
+                Uri uri = intent.getData();
                 Log.d(TAG, "----安装成功packageName:" + packageName);
-                Log.d(TAG, "----安装成功dataString:" + dataString);
+                Log.d(TAG, "----Uri:" + uri);
+                ArrayList<AppInfoEntity> appInfoEntities = new ArrayList<>(1);
+                AppInfoEntity entity = new AppInfoEntity();
+                entity.setAppName("");
+                entity.setPackageName(packageName);
+                entity.setAppType("2");
+                appInfoEntities.add(entity);
                 String returnUploadAppInfo = DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()
-                        , StudentCardService.this).uploadAppInfo(2);
+                        , StudentCardService.this).uploadAppInfo(2,appInfoEntities);
                 sendMsg(returnUploadAppInfo);
                 Toast.makeText(context, "安装成功" + packageName, Toast.LENGTH_LONG).show();
             } else if (TextUtils.equals(intent.getAction(), Intent.ACTION_PACKAGE_REPLACED)) {
                 String packageName = intent.getData().getSchemeSpecificPart();
-                Log.d(TAG, "----替换成功" + packageName);
+                Log.d(TAG, "----替换成功：" + packageName);
                 Toast.makeText(context, "替换成功" + packageName, Toast.LENGTH_LONG).show();
             } else if (TextUtils.equals(intent.getAction(), Intent.ACTION_PACKAGE_REMOVED)) {
                 String packageName = intent.getData().getSchemeSpecificPart();
-                Log.d(TAG, "----卸载成功" + packageName);
+                Log.d(TAG, "----卸载成功：" + packageName);
+                ArrayList<AppInfoEntity> appInfoEntities = new ArrayList<>(1);
+                AppInfoEntity entity = new AppInfoEntity();
+                entity.setAppName("");
+                entity.setPackageName(packageName);
+                entity.setAppType("2");
+                appInfoEntities.add(entity);
                 String returnUploadAppInfo = DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext(),
-                                StudentCardService.this).uploadAppInfo(3);
+                        StudentCardService.this).uploadAppInfo(3,appInfoEntities);
                 sendMsg(returnUploadAppInfo);
                 Toast.makeText(context, "卸载成功" + packageName, Toast.LENGTH_LONG).show();
             }
         }
+    }
+
+
+    /**
+     * 获取所有应用信息
+     *
+     * @return
+     */
+    private List<AppInfoEntity> getPackageAppInfo() {
+        PackageManager pm = this.getPackageManager();
+        @SuppressLint("WrongConstant")
+        List<PackageInfo> installList = pm.getInstalledPackages(PackageManager.PERMISSION_GRANTED);
+        Log.d("PackageInfo", "install_app_size--->" + installList.size());
+        ArrayList<AppInfoEntity> appInfoEntities = new ArrayList<>();
+        for (int i = 0; i < installList.size(); i++) {
+            PackageInfo item = installList.get(i);
+            AppInfoEntity appInfoEntity = new AppInfoEntity();
+            try {
+                String appName = item.applicationInfo.loadLabel(pm).toString();
+                String packageName = item.packageName;
+                String versionName = item.versionName;
+                Drawable appIcon = item.applicationInfo.loadIcon(pm);
+                if (isSystemApp(item)) {
+                    Log.w("PackageInfo", "系统应用---appName===>" + appName + "===packageName===>" + packageName +
+                            "===appIcon" + "===>" + appIcon);
+                    appInfoEntity.setAppType("1");
+                } else {
+                    Log.d("PackageInfo", "非系统应用---appName===>" + appName + "===packageName===>" + packageName +
+                            "===appIcon===>" + appIcon);
+                    appInfoEntity.setAppType("2");
+                }
+                appInfoEntity.setAppName(appName);
+                appInfoEntity.setPackageName(packageName);
+            } catch (Exception e) {
+                e.printStackTrace();
+                continue;
+            }
+            appInfoEntities.add(appInfoEntity);
+        }
+
+        return appInfoEntities;
+    }
+
+
+    private boolean isSystemApp(PackageInfo pi) {
+        boolean isSysApp = (pi.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 1;
+        boolean isSysUpd = (pi.applicationInfo.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 1;
+        return isSysApp || isSysUpd;
     }
 
 }

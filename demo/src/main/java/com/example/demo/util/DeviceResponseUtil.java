@@ -1,6 +1,7 @@
 package com.example.demo.util;
 
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.app.KeyguardManager;
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -35,15 +36,21 @@ import android.telephony.TelephonyManager;
 import android.telephony.cdma.CdmaCellLocation;
 import android.telephony.gsm.GsmCellLocation;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.Window;
+import android.view.WindowManager;
 
+import com.example.demo.R;
 import com.example.demo.db.WhiteListEntity;
 import com.example.demo.db.WhiteListUtil;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -720,18 +727,30 @@ public class DeviceResponseUtil {
 
     /**
      * 获取应用信息 并上传
-     * *WT,imei,UPLOADAPP,HHMMSS,type,groupNum,appName,package,DATE,STATUS#
-     * @param  :1:全量上报,2:增加上报,3:删除上报
+     * *WT,imei,UPLOADAPP,HHMMSS,type,groupNum,appName,appType,package,DATE,STATUS#
+     * appType:app类型 1:系统app,2应用市场app
+     *
+     * @param :1:全量上报,2:增加上报,3:删除上报
      * @return
      */
-    public String uploadAppInfo(int type) {
+    public String uploadAppInfo(int type, List<AppInfoEntity> appInfoEntities) {
         //*WT,imei,UPLOADAPP,HHMMSS,type,groupNum,appName,package,DATE,STATUS#
+        appInfoEntities.stream().forEach(new Consumer<AppInfoEntity>() {
+            @Override
+            public void accept(AppInfoEntity appInfoEntity) {
+                Log.d(TAG, " AppInfoEntity--->" + appInfoEntity.toString());
+            }
+        });
 
-        List<PackageInfo> packageAppInfo = getPackageAppInfo();
-
+        StringBuilder allAppInfo = new StringBuilder();
+        for (AppInfoEntity info : appInfoEntities) {
+            allAppInfo.append(info.getAppName()).append(",").append(info.getAppType())
+                    .append(",").append(info.getPackageName());
+        }
 
         String uploadAppInfoMsg = "*WT," + serialNum + ",UPLOADAPP," + hhmmss + "," + type +
-                "," + ddmmyy + ",FDFFFFFF#";
+                "," + appInfoEntities.size() + "," + allAppInfo + "," + ddmmyy + ",FDFFFFFF#";
+
         Log.i(TAG, " uploadAppInfoMsg--->" + uploadAppInfoMsg);
         return uploadAppInfoMsg;
     }
@@ -744,14 +763,15 @@ public class DeviceResponseUtil {
         //*WT,IMEI,APPDOWNLOAD,seq,switch,date,tracker_status#
         String[] split = message.split(",");
         String appInstallSwitch = split[4];
-        if ("0".equals(appInstallSwitch)) {
-            SystemProperties.set("switch.app.install", "0");
-        } else if ("1".equals(appInstallSwitch)) {
-            SystemProperties.set("switch.app.install", "1");
+        String installSwitch = appInstallSwitch.replace("#", "");
+        if ("0".equals(installSwitch)) {
+            SystemProperties.set("persist.sys.app.install", "0");
+        } else if ("1".equals(installSwitch)) {
+            SystemProperties.set("persist.sys.app.install", "1");
         }
 
         String installSwitchReturnMsg = "*WT," + serialNum + "," + "APPDOWNLOAD" + "," + "seq"
-                + "," + appInstallSwitch + "," + ddmmyy + ",FFFDFFFF#";
+                + "," + installSwitch + "," + ddmmyy + ",FFFDFFFF#";
         Log.i(TAG, " installSwitchReturnMsg--->" + installSwitchReturnMsg);
         return installSwitchReturnMsg;
     }
@@ -763,11 +783,12 @@ public class DeviceResponseUtil {
     private String appDisableSwitch(String message) {
         //*WT,IMEI,APPDISABLE,seq,package,switch,groupNum,stratTime,endTime,cycle#
         String[] split = message.split(",");
+        String appPackage = split[4];
         String appDisableSwitch = split[5];
         if ("0".equals(appDisableSwitch)) {
-            SystemProperties.set("switch.app.start", "0");
+            SystemProperties.set("persist.sys.app.start", "0");
         } else if ("1".equals(appDisableSwitch)) {
-            SystemProperties.set("switch.app.start", "1");
+            SystemProperties.set("persist.sys.app.start", "1");
         }
         String disableSwitchReturnMsg = "*WT," + serialNum + "," + "APPDISABLE" + "," + "seq"
                 + "," + appDisableSwitch + "," + ddmmyy + ",FFFDFFFF#";
@@ -805,45 +826,6 @@ public class DeviceResponseUtil {
     //        return ret;
     //    }
 
-    /**
-     * 获取所有应用信息
-     *
-     * @return
-     */
-    private List<PackageInfo> getPackageAppInfo() {
-        PackageManager pm = mContext.getPackageManager();
-        @SuppressLint("WrongConstant")
-        List<PackageInfo> installList = pm.getInstalledPackages(PackageManager.PERMISSION_GRANTED);
-        Log.d("PackageInfo", "install_app_size--->" + installList.size());
-        for (int i = 0; i < installList.size(); i++) {
-            PackageInfo item = installList.get(i);
-            try {
-                String appName = item.applicationInfo.loadLabel(pm).toString();
-                String packageName = item.packageName;
-                String versionName = item.versionName;
-                Drawable appIcon = item.applicationInfo.loadIcon(pm);
-                if (isSystemApp(item)) {
-                    Log.w("PackageInfo", "系统应用---appName===>" + appName + "===packageName===>" + packageName +
-                            "===appIcon" + "===>" + appIcon);
-                } else {
-                    Log.d("PackageInfo", "非系统应用---appName===>" + appName + "===packageName===>" + packageName +
-                            "===appIcon===>" + appIcon);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                continue;
-            }
-        }
-
-        return installList;
-    }
-
-
-    private boolean isSystemApp(PackageInfo pi) {
-        boolean isSysApp = (pi.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 1;
-        boolean isSysUpd = (pi.applicationInfo.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 1;
-        return isSysApp || isSysUpd;
-    }
 
     private class MySensorEventListener implements SensorEventListener {
         @Override
