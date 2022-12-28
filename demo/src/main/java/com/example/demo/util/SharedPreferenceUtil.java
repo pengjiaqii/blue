@@ -6,6 +6,9 @@ import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
 import android.content.SharedPreferences.Editor;
 import android.text.TextUtils;
+import android.util.Log;
+
+import org.json.JSONObject;
 
 import java.util.List;
 import java.util.Map;
@@ -16,10 +19,8 @@ public class SharedPreferenceUtil {
     private Editor editor;
     private final int ZERO = 0;
 
-    private String preference_default_name =
-
     public SharedPreferenceUtil(Context context) {
-        this(context, ConfigUtils.PREFERENCE_DEFAULT_NAME, Context.MODE_PRIVATE);
+        this(context, "default_app_disable_entity", Context.MODE_PRIVATE);
     }
 
     public SharedPreferenceUtil(Context context, String preferenceName) {
@@ -170,60 +171,6 @@ public class SharedPreferenceUtil {
     }
 
     /**
-     * 添加对象
-     *
-     * @param key
-     * @param t
-     */
-    public <T> void putModel(String key, T t) {
-        if (!TextUtils.isEmpty(key) && t != null) {
-            putString(key, JSON.toJSONString(t));// fastjson
-        }
-    }
-
-    /**
-     * 获取对象
-     *
-     * @param key
-     * @param t
-     * @return
-     */
-    public <T> T getModel(String key, Class<T> clazz) {
-        String value = null;
-        if (!TextUtils.isEmpty(key)) {
-            value = getString(key);
-        }
-        return TextUtils.isEmpty(value) ? null : JSON.parseObject(value, clazz);// fastjson
-    }
-
-    /**
-     * 添加集合
-     *
-     * @param key
-     * @param t
-     */
-    public <T> void putModels(String key, List<T> t) {
-        if (!TextUtils.isEmpty(key) && t != null && t.size() > ZERO) {
-            putString(key, JSON.toJSONString(t));// fastjson
-        }
-    }
-
-    /**
-     * 获取集合
-     *
-     * @param key
-     * @param t
-     * @return
-     */
-    public <T> List<T> getModels(String key, Class<T> clazz) {
-        String value = null;
-        if (!TextUtils.isEmpty(key)) {
-            value = getString(key);
-        }
-        return TextUtils.isEmpty(value) ? null : JSON.parseArray(value, clazz);// fastjson
-    }
-
-    /**
      * 查询某个key是否已经存在
      *
      * @param key
@@ -266,7 +213,8 @@ public class SharedPreferenceUtil {
     public void selectKeyAll() {
         Map<String, Object> map = (Map<String, Object>) sharedPreferences.getAll();
         for (String key : map.keySet()) {
-            Print.d("key= " + key + " and value= " + map.get(key));
+            Log.d("SharedPreferenceUtil", " key--->" + key);
+            Log.d("SharedPreferenceUtil", " value--->" + map.get(key));
         }
     }
 }

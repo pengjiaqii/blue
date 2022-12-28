@@ -15,6 +15,7 @@
     <option name="modulesWithSuppressedNotConfigured">
       <set>
         <option value="MyApplication.alertdemo" />
+        <option value="MyApplication.testapp" />
         <option value="takephoto" />
       </set>
     </option>

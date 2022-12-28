@@ -35,6 +35,7 @@ import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.telephony.cdma.CdmaCellLocation;
 import android.telephony.gsm.GsmCellLocation;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.Window;
@@ -43,6 +44,10 @@ import android.view.WindowManager;
 import com.example.demo.R;
 import com.example.demo.db.WhiteListEntity;
 import com.example.demo.db.WhiteListUtil;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONStringer;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -149,7 +154,12 @@ public class DeviceResponseUtil {
         } else if (message.contains("WT") && message.contains("APPDOWNLOAD")) {
             return appInstallSwitch(message);
         } else if (message.contains("WT") && message.contains("APPDISABLE")) {
-            return appDisableSwitch(message);
+            try {
+                return appDisableSwitch(message);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                return "";
+            }
         } else if (message.contains("V2SIGNAL")) {
             return generateV2signal(message);
         } else {
@@ -780,20 +790,208 @@ public class DeviceResponseUtil {
      * 指令关键字：APPDISABLE
      * Switch:0-关闭 1-打开(打开app禁用，则禁止所有时间段内禁用,关闭禁用,则可限制使用时间)
      */
-    private String appDisableSwitch(String message) {
-        //*WT,IMEI,APPDISABLE,seq,package,switch,groupNum,stratTime,endTime,cycle#
-        String[] split = message.split(",");
+    private String appDisableSwitch(String message) throws JSONException {
+        //*WT,IMEI,APPDISABLE,seq,package,switch,groupNum,startTime,endTime,cycle,activation#
+        String noSharp = message.replace("#", "");
+
+        String[] split = noSharp.split(",");
         String appPackage = split[4];
         String appDisableSwitch = split[5];
+        String groupNum = split[6];
+
+        String appDisableJsonStr = generateDisableInfo(split, groupNum);
+        SharedPreferenceUtil util = new SharedPreferenceUtil(mContext);
+        util.putString("com.android.calendar", appDisableJsonStr);
+
         if ("0".equals(appDisableSwitch)) {
             SystemProperties.set("persist.sys.app.start", "0");
         } else if ("1".equals(appDisableSwitch)) {
             SystemProperties.set("persist.sys.app.start", "1");
         }
         String disableSwitchReturnMsg = "*WT," + serialNum + "," + "APPDISABLE" + "," + "seq"
-                + "," + appDisableSwitch + "," + ddmmyy + ",FFFDFFFF#";
+                + "," + appPackage + "," + appDisableSwitch + "," + ddmmyy + ",FFFDFFFF#";
         Log.i(TAG, " disableSwitchReturnMsg--->" + disableSwitchReturnMsg);
         return disableSwitchReturnMsg;
+    }
+
+    /**
+     * @param split
+     * @param groupNum 最多下发三组
+     * @return
+     * @throws JSONException
+     */
+    private String generateDisableInfo(String[] split, String groupNum) throws JSONException {
+        String appDisableJsonStr = "";
+        JSONStringer appDisable = new JSONStringer();
+        JSONStringer jsonStringer = appDisable.object();
+        for (int i = 1; i <= Integer.parseInt(groupNum); i++) {
+            jsonStringer.key("groupNum").value(groupNum)
+                    .key("startTime" + i).value(split[7 + 4 * i])
+                    .key("endTime" + i).value(split[8 + 4 * i])
+                    .key("cycle" + i).value(split[9 + 4 * i])
+                    .key("activation" + i).value(split[10 + 4 * i]);
+        }
+        appDisableJsonStr = jsonStringer.endObject().toString();
+
+
+        SharedPreferenceUtil util = new SharedPreferenceUtil(mContext);
+        String testString = util.getString("com.android.calendar");
+
+        JSONObject jsonObject = new JSONObject(testString);
+        if (jsonObject.length() != 0) {
+            String groupNum = jsonObject.getString("groupNum");
+            if(TextUtils.equals(groupNum,"1")){
+                String startTime1 = jsonObject.getString("startTime1");
+                String endTime1 = jsonObject.getString("endTime1");
+                String cycle1 = jsonObject.getString("cycle1");
+                String activation1 = jsonObject.getString("activation1");
+
+            }else if(TextUtils.equals(groupNum,"2")){
+                String startTime1 = jsonObject.getString("startTime1");
+                String endTime1 = jsonObject.getString("endTime1");
+                String cycle1 = jsonObject.getString("cycle1");
+                String activation1 = jsonObject.getString("activation1");
+
+                String startTime2 = jsonObject.getString("startTime2");
+                String endTime2 = jsonObject.getString("endTime2");
+                String cycle2 = jsonObject.getString("cycle2");
+                String activation2 = jsonObject.getString("activation2");
+
+            }else if(TextUtils.equals(groupNum,"3")){
+                String startTime1 = jsonObject.getString("startTime1");
+                String endTime1 = jsonObject.getString("endTime1");
+                String cycle1 = jsonObject.getString("cycle1");
+                String activation1 = jsonObject.getString("activation1");
+
+                String startTime2 = jsonObject.getString("startTime2");
+                String endTime2 = jsonObject.getString("endTime2");
+                String cycle2 = jsonObject.getString("cycle2");
+                String activation2 = jsonObject.getString("activation2");
+
+                String startTime3 = jsonObject.getString("startTime3");
+                String endTime3 = jsonObject.getString("endTime3");
+                String cycle3 = jsonObject.getString("cycle3");
+                String activation3 = jsonObject.getString("activation3");
+            }
+        }
+
+        //        if (TextUtils.equals(groupNum, "1")) {
+        //            String startTime1 = split[7];
+        //            String endTime1 = split[8];
+        //            String cycle1 = split[9];
+        //            String activation1 = split[10];
+        //
+        //            JSONStringer appDisable = new JSONStringer();
+        //            appDisableJsonStr = appDisable
+        //                    .object()
+        //                    .key("groupNum")
+        //                    .value(groupNum)
+        //                    .key("startTime1")
+        //                    .value(startTime1)
+        //                    .key("endTime1")
+        //                    .value(endTime1)
+        //                    .key("cycle1")
+        //                    .value(cycle1)
+        //                    .key("activation1")
+        //                    .value(activation1)
+        //                    .endObject()
+        //                    .toString();
+        //
+        //
+        //        } else if (TextUtils.equals(groupNum, "2")) {
+        //            String startTime1 = split[7];
+        //            String endTime1 = split[8];
+        //            String cycle1 = split[9];
+        //            String activation1 = split[10];
+        //
+        //            String startTime2 = split[11];
+        //            String endTime2 = split[12];
+        //            String cycle2 = split[13];
+        //            String activation2 = split[14];
+        //
+        //            JSONStringer appDisable = new JSONStringer();
+        //            appDisableJsonStr = appDisable
+        //                    .object()
+        //                    .key("groupNum")
+        //                    .value(groupNum)
+        //
+        //                    .key("startTime1")
+        //                    .value(startTime1)
+        //                    .key("endTime1")
+        //                    .value(endTime1)
+        //                    .key("cycle1")
+        //                    .value(cycle1)
+        //                    .key("activation1")
+        //                    .value(activation1)
+        //
+        //                    .key("startTime2")
+        //                    .value(startTime2)
+        //                    .key("endTime2")
+        //                    .value(endTime2)
+        //                    .key("cycle2")
+        //                    .value(cycle2)
+        //                    .key("activation2")
+        //
+        //                    .value(activation2)
+        //                    .endObject()
+        //                    .toString();
+        //
+        //
+        //        } else if (TextUtils.equals(groupNum, "3")) {
+        //            String startTime1 = split[7];
+        //            String endTime1 = split[8];
+        //            String cycle1 = split[9];
+        //            String activation1 = split[10];
+        //
+        //            String startTime2 = split[11];
+        //            String endTime2 = split[12];
+        //            String cycle2 = split[13];
+        //            String activation2 = split[14];
+        //
+        //            String startTime3 = split[15];
+        //            String endTime3 = split[16];
+        //            String cycle3 = split[17];
+        //            String activation3 = split[18];
+        //
+        //            JSONStringer appDisable = new JSONStringer();
+        //            appDisableJsonStr = appDisable
+        //                    .object()
+        //                    .key("groupNum")
+        //                    .value(groupNum)
+        //
+        //                    .key("startTime1")
+        //                    .value(startTime1)
+        //                    .key("endTime1")
+        //                    .value(endTime1)
+        //                    .key("cycle1")
+        //                    .value(cycle1)
+        //                    .key("activation1")
+        //                    .value(activation1)
+        //
+        //                    .key("startTime2")
+        //                    .value(startTime2)
+        //                    .key("endTime2")
+        //                    .value(endTime2)
+        //                    .key("cycle2")
+        //                    .value(cycle2)
+        //                    .key("activation2")
+        //                    .value(activation2)
+        //
+        //                    .key("startTime3")
+        //                    .value(startTime3)
+        //                    .key("endTime3")
+        //                    .value(endTime3)
+        //                    .key("cycle3")
+        //                    .value(cycle3)
+        //                    .key("activation3")
+        //                    .value(activation3)
+        //
+        //                    .endObject()
+        //                    .toString();
+        //
+        //        }
+        Log.d(TAG, " appDisableJsonStr--->" + appDisableJsonStr);
+        return appDisableJsonStr;
     }
 
 
