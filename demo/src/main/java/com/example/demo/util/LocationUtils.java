@@ -8,6 +8,7 @@ import android.location.GpsStatus;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.location.LocationProvider;
 import android.os.Bundle;
 import android.util.Log;
 
@@ -58,9 +59,28 @@ public class LocationUtils {
             locationManager.requestLocationUpdates(locationProvider, 10000, 1,
                     (LocationListener) (new LocationListener() {
                         public void onStatusChanged(String provider, int status, Bundle arg2) {
+                            switch (status) {
+                                // GPS状态为可见时
+                                case LocationProvider.AVAILABLE:
+                                    Log.i(TAG, "当前GPS状态为可见状态");
+                                    break;
+                                // GPS状态为服务区外时
+                                case LocationProvider.OUT_OF_SERVICE:
+                                    Log.i(TAG, "当前GPS状态为服务区外状态");
+                                    break;
+                                // GPS状态为暂停服务时
+                                case LocationProvider.TEMPORARILY_UNAVAILABLE:
+                                    Log.i(TAG, "当前GPS状态为暂停服务状态");
+                                    break;
+                            }
                         }
 
                         public void onProviderEnabled(String provider) {
+                            Location location = locationManager.getLastKnownLocation(provider);
+                            latitude = location.getLatitude();
+                            longitude = location.getLongitude();
+                            Log.d(TAG, "onProviderEnabled----location.latitude: " + latitude);
+                            Log.d(TAG, "onProviderEnabled----location.longitude:  " + longitude);
                         }
 
                         public void onProviderDisabled(String provider) {
@@ -70,8 +90,8 @@ public class LocationUtils {
                             Log.i(TAG, "onLocationChanged");
                             latitude = loc.getLatitude();
                             longitude = loc.getLongitude();
-                            Log.d(TAG, "location.latitude: " + latitude);
-                            Log.d(TAG, "location.longitude:  " + longitude);
+                            Log.d(TAG, "onLocationChanged---location.latitude: " + latitude);
+                            Log.d(TAG, "onLocationChanged---location.longitude:  " + longitude);
                         }
                     }));
         }

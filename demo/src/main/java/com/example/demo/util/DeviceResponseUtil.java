@@ -1,7 +1,6 @@
 package com.example.demo.util;
 
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
 import android.app.KeyguardManager;
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -9,10 +8,8 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
-import android.graphics.drawable.Drawable;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -36,10 +33,10 @@ import android.telephony.TelephonyManager;
 import android.telephony.cdma.CdmaCellLocation;
 import android.telephony.gsm.GsmCellLocation;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.util.Log;
-import android.view.Gravity;
-import android.view.Window;
-import android.view.WindowManager;
+
+import androidx.annotation.Nullable;
 
 import com.example.demo.R;
 import com.example.demo.db.WhiteListEntity;
@@ -49,9 +46,10 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONStringer;
 
+import java.io.ByteArrayOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -90,7 +88,7 @@ public class DeviceResponseUtil {
     private double latitude;
     private double longitude;
 
-    String serialNum = "TEST0123456789ABCDEF";
+    String serialNum = "0123456789ABCDE";
 
     private SubscriptionManager mSubscriptionManager;
 
@@ -120,7 +118,7 @@ public class DeviceResponseUtil {
     private float steps;
 
     public String handleCmdMessage(String message) {
-        serialNum = SystemProperties.get("ro.serialno", "0123456789ABCDEF");
+        serialNum = SystemProperties.get("ro.serialno", "0123456789ABCDE");
         Log.i(TAG, "serialNum===>" + serialNum);
         //        String android_id=android.provider.Settings.System.getString(mContext.getContentResolver(), "android_id");
         //        Log.e(TAG, "android_id===>" + android_id);
@@ -209,9 +207,12 @@ public class DeviceResponseUtil {
         WhiteListUtil.getInstance(mContext).query(wl_num);
         WhiteListUtil.getInstance(mContext).queryAll();
 
-        String pbwlReturnMsg = "*WT," + serialNum + ",V4" + ",PBWL," + lastTime + "," + splitMeg[4] + "," + splitMeg[5] +
-                "," + splitMeg[6] + "," + splitMeg[7] + "," + splitMeg[8] + "," + hhmmss + ",V," + latitude +
-                "," + longitude + "," + ddmmyy + ",FFFFFFFD#";
+        String pbwlReturnMsg = "*WT," + serialNum + ",V4" +
+                ",PBWL," + lastTime + "," + splitMeg[4] +
+                "," + splitMeg[5] + "," + splitMeg[6] +
+                "," + splitMeg[7] + "," + splitMeg[8] +
+                "," + hhmmss + ",V," + latitude + "," +
+                longitude + "," + ddmmyy + ",FFFFFFFD#";
         Log.i(TAG, " pbwlReturnMsg--->" + pbwlReturnMsg);
         return pbwlReturnMsg;
     }
@@ -260,9 +261,11 @@ public class DeviceResponseUtil {
             Log.i(TAG, "WhiteListEntity：" + entity.toString());
         }
 
-        String pbwlAllReturnMsg = "*WT," + serialNum + ",V4" + ",PBWLALL," + lastTime + "," + splitMeg[4] + "," + splitMeg[5] +
-                "," + splitMeg[6] + "," + splitMeg[7] + "," + hhmmss + ",A," + latitude +
-                "," + longitude + "," + ddmmyy + ",FFFFFFFF#";
+        String pbwlAllReturnMsg = "*WT," + serialNum + ",V4" +
+                ",PBWLALL," + lastTime + "," + splitMeg[4] + "," +
+                splitMeg[5] + "," + splitMeg[6] + "," + splitMeg[7] +
+                "," + hhmmss + ",A," + latitude + "," + longitude +
+                "," + ddmmyy + ",FFFFFFFF#";
 
         Log.i(TAG, " pbwlAllReturnMsg--->" + pbwlAllReturnMsg);
 
@@ -306,11 +309,13 @@ public class DeviceResponseUtil {
         insertWhiteList(wl_num2, wl_name2, wl_phone2);
 
 
-        String setSOSReturnMsg = "*WT," + serialNum + ",V4" + ",SETSOS," + lastTime + "," + hhmmss +
-                "," + splitMeg[4] + "," + splitMeg[5] + "," + splitMeg[6] +
-                "," + splitMeg[7] + "," + splitMeg[8] + "," + splitMeg[9] +
-                "," + splitMeg[10] + "," + splitMeg[11] + "," + splitMeg[12] +
-                ",V," + latitude + "," + longitude + "," + ddmmyy + ",FDFFFFFF#";
+        String setSOSReturnMsg = "*WT," + serialNum + ",V4" +
+                ",SETSOS," + lastTime + "," + hhmmss + "," +
+                splitMeg[4] + "," + splitMeg[5] + "," + splitMeg[6] +
+                "," + splitMeg[7] + "," + splitMeg[8] + "," +
+                splitMeg[9] + "," + splitMeg[10] + "," + splitMeg[11] +
+                "," + splitMeg[12] + ",V," + latitude + "," +
+                longitude + "," + ddmmyy + ",FDFFFFFF#";
         Log.i(TAG, " setSOSReturnMeg--->" + setSOSReturnMsg);
         return setSOSReturnMsg;
     }
@@ -637,8 +642,10 @@ public class DeviceResponseUtil {
         //电量
         int intBattery = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
 
-        String d1ReturnMsg = "*WT," + serialNum + ",V4" + ",D1," + lastTime + "," + hhmmss + ",A," + latitude + "," + longitude +
-                "," + baseStation + "," + steps + "," + intBattery + "," + ddmmyy + ",FDFFFFFF#";
+        String d1ReturnMsg = "*WT," + serialNum + ",V4" +
+                ",D1," + lastTime + "," + hhmmss + ",A," + latitude +
+                "," + longitude + "," + baseStation + "," + steps +
+                "," + intBattery + "," + ddmmyy + ",FDFFFFFF#";
         Log.i(TAG, " d1ReturnMsg--->" + d1ReturnMsg);
 
         return d1ReturnMsg;
@@ -727,8 +734,8 @@ public class DeviceResponseUtil {
             baseStation = mcc + "," + mnc + "," + "0" + "," + infos.size() + "," + lac + "," + cid + "," + dbm;
         }
 
-        message = "*WT," + serialNum + ",SOS," + hhmmss + ",A," + latitude + "," + longitude +
-                "," + baseStation + "," + ddmmyy + ",FFFFFFFD";
+        message = "*WT," + serialNum + ",SOS," + hhmmss + ",A," + latitude + "," + longitude + ","
+                + baseStation + "," + ddmmyy + ",FFFFFFFD";
 
         Log.i(TAG, " 获取邻区基站信息:" + baseStation);
 
@@ -758,8 +765,46 @@ public class DeviceResponseUtil {
                     .append(",").append(info.getPackageName());
         }
 
-        String uploadAppInfoMsg = "*WT," + serialNum + ",UPLOADAPP," + hhmmss + "," + type +
-                "," + appInfoEntities.size() + "," + allAppInfo + "," + ddmmyy + ",FDFFFFFF#";
+        String uploadAppInfoMsg = new StringBuilder().append("*WT,").append(serialNum).append(",UPLOADAPP,")
+                .append(hhmmss).append(",").append(type).append(",").append(appInfoEntities.size())
+                .append(",").append(allAppInfo).append(",").append(ddmmyy).append(",FDFFFFFF#").toString();
+
+        Log.i(TAG, " uploadAppInfoMsg--->" + uploadAppInfoMsg);
+        return uploadAppInfoMsg;
+    }
+
+    /**
+     * 上传app图标
+     *
+     * @param type
+     * @param appInfoEntities
+     * @return
+     */
+    public String uploadAppImage(int type, List<AppInfoEntity> appInfoEntities) {
+        //*WT,imei,UPLOADAPP,HHMMSS,type,groupNum,appName,package,DATE,STATUS#
+        appInfoEntities.stream().forEach(new Consumer<AppInfoEntity>() {
+            @Override
+            public void accept(AppInfoEntity appInfoEntity) {
+                Log.d(TAG, " AppInfoEntity--->" + appInfoEntity.toString());
+            }
+        });
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        Bitmap bitmap = BitmapFactory.decodeResource(mContext.getResources(), R.drawable.logo);
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+        byte[] imageBytes = baos.toByteArray();
+        String imageString = Base64.encodeToString(imageBytes, Base64.DEFAULT);
+
+        StringBuilder allAppInfo = new StringBuilder();
+        for (AppInfoEntity info : appInfoEntities) {
+            allAppInfo.append(info.getAppName()).append(",").append(info.getAppType())
+                    .append(",").append(info.getPackageName());
+        }
+
+        String uploadAppInfoMsg = new StringBuilder().append("*WT,").append(serialNum).append(",UPLOADAPP,")
+                .append(hhmmss).append(",").append(type).append(",").append(appInfoEntities.size())
+                .append(",").append(allAppInfo).append(",").append(ddmmyy).append(",FDFFFFFF#").toString();
 
         Log.i(TAG, " uploadAppInfoMsg--->" + uploadAppInfoMsg);
         return uploadAppInfoMsg;
@@ -780,8 +825,9 @@ public class DeviceResponseUtil {
             SystemProperties.set("persist.sys.app.install", "1");
         }
 
-        String installSwitchReturnMsg = "*WT," + serialNum + "," + "APPDOWNLOAD" + "," + "seq"
-                + "," + installSwitch + "," + ddmmyy + ",FFFDFFFF#";
+        String installSwitchReturnMsg = "*WT," + serialNum + "," +
+                "APPDOWNLOAD" + "," + serialNum + "," + installSwitch +
+                "," + ddmmyy + ",FFFDFFFF#";
         Log.i(TAG, " installSwitchReturnMsg--->" + installSwitchReturnMsg);
         return installSwitchReturnMsg;
     }
@@ -800,200 +846,226 @@ public class DeviceResponseUtil {
         String groupNum = split[6];
 
         String appDisableJsonStr = generateDisableInfo(split, groupNum);
+
         SharedPreferenceUtil util = new SharedPreferenceUtil(mContext);
-        util.putString("com.android.calendar", appDisableJsonStr);
+        util.putString(appPackage, appDisableJsonStr);
 
         if ("0".equals(appDisableSwitch)) {
             SystemProperties.set("persist.sys.app.start", "0");
         } else if ("1".equals(appDisableSwitch)) {
             SystemProperties.set("persist.sys.app.start", "1");
         }
-        String disableSwitchReturnMsg = "*WT," + serialNum + "," + "APPDISABLE" + "," + "seq"
-                + "," + appPackage + "," + appDisableSwitch + "," + ddmmyy + ",FFFDFFFF#";
-        Log.i(TAG, " disableSwitchReturnMsg--->" + disableSwitchReturnMsg);
-        return disableSwitchReturnMsg;
+        StringBuilder disableSwitchReturnMsg = new StringBuilder().append("*WT,").append(serialNum).append(",")
+                .append("APPDISABLE").append(",").append(serialNum).append(",").append(appPackage).append(",")
+                .append(appDisableSwitch).append(",");
+        int group = Integer.parseInt(groupNum);
+        for (int i = 1; i <= group; i++) {
+            disableSwitchReturnMsg.append(split[3 + 4 * i]).append(",").append(split[4 + 4 * i]).append(",")
+                    .append(split[5 + 4 * i]).append(",").append(split[6 + 4 * i]).append(",");
+        }
+
+        disableSwitchReturnMsg.append(ddmmyy).append(",FFFDFFFF#");
+        Log.i(TAG, " disableSwitchReturnMsg--->" + disableSwitchReturnMsg.toString());
+        return disableSwitchReturnMsg.toString();
     }
 
     /**
      * @param split
-     * @param groupNum 最多下发三组
+     * @param currentGroupNum 最多下发三组
      * @return
      * @throws JSONException
      */
-    private String generateDisableInfo(String[] split, String groupNum) throws JSONException {
+    private String generateDisableInfo(String[] split, String currentGroupNum) {
         String appDisableJsonStr = "";
         JSONStringer appDisable = new JSONStringer();
         JSONStringer jsonStringer = appDisable.object();
-        for (int i = 1; i <= Integer.parseInt(groupNum); i++) {
-            jsonStringer.key("groupNum").value(groupNum)
-                    .key("startTime" + i).value(split[7 + 4 * i])
-                    .key("endTime" + i).value(split[8 + 4 * i])
-                    .key("cycle" + i).value(split[9 + 4 * i])
-                    .key("activation" + i).value(split[10 + 4 * i]);
+        int group = Integer.parseInt(currentGroupNum);
+        Log.d(TAG, " group--->" + group);
+        for (int i = 1; i <= group; i++) {
+            jsonStringer.key("groupNum").value(currentGroupNum)
+                    .key("startTime" + i).value(split[3 + 4 * i])
+                    .key("endTime" + i).value(split[4 + 4 * i])
+                    .key("cycle" + i).value(split[5 + 4 * i])
+                    .key("activation" + i).value(split[6 + 4 * i]);
         }
         appDisableJsonStr = jsonStringer.endObject().toString();
 
-
+        //处理存储到的对应包名的禁用信息
         SharedPreferenceUtil util = new SharedPreferenceUtil(mContext);
-        String testString = util.getString("com.android.calendar");
+        String testString = util.getString(split[4]);
+        Log.d(TAG, "当前应用对应的禁用信息--->" + testString);
+        boolean appStartDisable = false;
+        if (!TextUtils.isEmpty(testString)) {
+            try {
+                appStartDisable = isAppStartDisable(testString);
+            } catch (JSONException e) {
+                Log.e("StudentCardService","JSONException--->"+e);
+                e.printStackTrace();
+            }
+        }
+        Log.e(TAG,"禁用应用吗？--->"+appStartDisable);
+        Log.d(TAG, " appStartDisable--->" + appStartDisable);
+
+        Log.d(TAG, " appDisableJsonStr--->" + appDisableJsonStr);
+        return appDisableJsonStr;
+    }
+
+
+    private boolean isAppStartDisable(String testString) throws JSONException {
+        //获取当前的日期信息做比对
+        Calendar calendar = Calendar.getInstance();//取得当前时间的年月日 时分秒
+        int year = calendar.get(Calendar.YEAR);
+        int month = calendar.get(Calendar.MONTH) + 1;
+        int day = calendar.get(Calendar.DAY_OF_MONTH);
+        int hour = calendar.get(Calendar.HOUR_OF_DAY);
+        int minute = calendar.get(Calendar.MINUTE);
+        int second = calendar.get(Calendar.SECOND);
+        Log.d(TAG, "year--->" + year);
+        Log.d(TAG, "month--->" + month);
+        Log.d(TAG, "day--->" + day);
+        Log.d(TAG, "hour--->" + hour);
+        Log.d(TAG, "minute--->" + minute);
+        Log.d(TAG, "second--->" + second);
+
+        String weekOfDate = getWeekOfDate(new Date());
+        Log.d(TAG, "weekOfDate--->" + weekOfDate);
+
+        boolean isAppDisable = false;
+
 
         JSONObject jsonObject = new JSONObject(testString);
         if (jsonObject.length() != 0) {
             String groupNum = jsonObject.getString("groupNum");
-            if(TextUtils.equals(groupNum,"1")){
+            Log.d(TAG, "获取到的组数groupNum--->" + groupNum);
+            if (TextUtils.equals(groupNum, "1")) {
                 String startTime1 = jsonObject.getString("startTime1");
                 String endTime1 = jsonObject.getString("endTime1");
                 String cycle1 = jsonObject.getString("cycle1");
                 String activation1 = jsonObject.getString("activation1");
 
-            }else if(TextUtils.equals(groupNum,"2")){
+                Log.d(TAG, "startTime1--->" + startTime1);
+                Log.d(TAG, "endTime1--->" + endTime1);
+                Log.d(TAG, "cycle1--->" + cycle1);
+                Log.d(TAG, "startTime1--->" + startTime1);
+
+                boolean appDisableStatus1 = getAppDisableStatus(hour, weekOfDate, startTime1, endTime1, cycle1);
+                Log.d(TAG, "appDisableStatus1--->" + appDisableStatus1);
+
+                if (appDisableStatus1) {
+                    //禁用
+                    isAppDisable = true;
+                }
+
+            } else if (TextUtils.equals(groupNum, "2")) {
                 String startTime1 = jsonObject.getString("startTime1");
                 String endTime1 = jsonObject.getString("endTime1");
                 String cycle1 = jsonObject.getString("cycle1");
                 String activation1 = jsonObject.getString("activation1");
+
+                boolean appDisableStatus1 = getAppDisableStatus(hour, weekOfDate, startTime1, endTime1, cycle1);
+                Log.d(TAG, "appDisableStatus1--->" + appDisableStatus1);
 
                 String startTime2 = jsonObject.getString("startTime2");
                 String endTime2 = jsonObject.getString("endTime2");
                 String cycle2 = jsonObject.getString("cycle2");
                 String activation2 = jsonObject.getString("activation2");
 
-            }else if(TextUtils.equals(groupNum,"3")){
+                boolean appDisableStatus2 = getAppDisableStatus(hour, weekOfDate, startTime2, endTime2, cycle2);
+                Log.d(TAG, "appDisableStatus2--->" + appDisableStatus2);
+
+                if (appDisableStatus1 || appDisableStatus2) {
+                    //禁用
+                    isAppDisable = true;
+                }
+
+            } else if (TextUtils.equals(groupNum, "3")) {
                 String startTime1 = jsonObject.getString("startTime1");
                 String endTime1 = jsonObject.getString("endTime1");
                 String cycle1 = jsonObject.getString("cycle1");
                 String activation1 = jsonObject.getString("activation1");
 
+                boolean appDisableStatus1 = getAppDisableStatus(hour, weekOfDate, startTime1, endTime1, cycle1);
+                Log.d(TAG, "appDisableStatus1--->" + appDisableStatus1);
+
                 String startTime2 = jsonObject.getString("startTime2");
                 String endTime2 = jsonObject.getString("endTime2");
                 String cycle2 = jsonObject.getString("cycle2");
                 String activation2 = jsonObject.getString("activation2");
+
+                boolean appDisableStatus2 = getAppDisableStatus(hour, weekOfDate, startTime2, endTime2, cycle2);
+                Log.d(TAG, "appDisableStatus2--->" + appDisableStatus2);
 
                 String startTime3 = jsonObject.getString("startTime3");
                 String endTime3 = jsonObject.getString("endTime3");
                 String cycle3 = jsonObject.getString("cycle3");
                 String activation3 = jsonObject.getString("activation3");
+
+                boolean appDisableStatus3 = getAppDisableStatus(hour, weekOfDate, startTime3, endTime3, cycle3);
+                Log.d(TAG, "appDisableStatus3--->" + appDisableStatus3);
+
+                if (appDisableStatus1 || appDisableStatus2 || appDisableStatus3) {
+                    //禁用
+                    isAppDisable = true;
+                }
             }
         }
-
-        //        if (TextUtils.equals(groupNum, "1")) {
-        //            String startTime1 = split[7];
-        //            String endTime1 = split[8];
-        //            String cycle1 = split[9];
-        //            String activation1 = split[10];
-        //
-        //            JSONStringer appDisable = new JSONStringer();
-        //            appDisableJsonStr = appDisable
-        //                    .object()
-        //                    .key("groupNum")
-        //                    .value(groupNum)
-        //                    .key("startTime1")
-        //                    .value(startTime1)
-        //                    .key("endTime1")
-        //                    .value(endTime1)
-        //                    .key("cycle1")
-        //                    .value(cycle1)
-        //                    .key("activation1")
-        //                    .value(activation1)
-        //                    .endObject()
-        //                    .toString();
-        //
-        //
-        //        } else if (TextUtils.equals(groupNum, "2")) {
-        //            String startTime1 = split[7];
-        //            String endTime1 = split[8];
-        //            String cycle1 = split[9];
-        //            String activation1 = split[10];
-        //
-        //            String startTime2 = split[11];
-        //            String endTime2 = split[12];
-        //            String cycle2 = split[13];
-        //            String activation2 = split[14];
-        //
-        //            JSONStringer appDisable = new JSONStringer();
-        //            appDisableJsonStr = appDisable
-        //                    .object()
-        //                    .key("groupNum")
-        //                    .value(groupNum)
-        //
-        //                    .key("startTime1")
-        //                    .value(startTime1)
-        //                    .key("endTime1")
-        //                    .value(endTime1)
-        //                    .key("cycle1")
-        //                    .value(cycle1)
-        //                    .key("activation1")
-        //                    .value(activation1)
-        //
-        //                    .key("startTime2")
-        //                    .value(startTime2)
-        //                    .key("endTime2")
-        //                    .value(endTime2)
-        //                    .key("cycle2")
-        //                    .value(cycle2)
-        //                    .key("activation2")
-        //
-        //                    .value(activation2)
-        //                    .endObject()
-        //                    .toString();
-        //
-        //
-        //        } else if (TextUtils.equals(groupNum, "3")) {
-        //            String startTime1 = split[7];
-        //            String endTime1 = split[8];
-        //            String cycle1 = split[9];
-        //            String activation1 = split[10];
-        //
-        //            String startTime2 = split[11];
-        //            String endTime2 = split[12];
-        //            String cycle2 = split[13];
-        //            String activation2 = split[14];
-        //
-        //            String startTime3 = split[15];
-        //            String endTime3 = split[16];
-        //            String cycle3 = split[17];
-        //            String activation3 = split[18];
-        //
-        //            JSONStringer appDisable = new JSONStringer();
-        //            appDisableJsonStr = appDisable
-        //                    .object()
-        //                    .key("groupNum")
-        //                    .value(groupNum)
-        //
-        //                    .key("startTime1")
-        //                    .value(startTime1)
-        //                    .key("endTime1")
-        //                    .value(endTime1)
-        //                    .key("cycle1")
-        //                    .value(cycle1)
-        //                    .key("activation1")
-        //                    .value(activation1)
-        //
-        //                    .key("startTime2")
-        //                    .value(startTime2)
-        //                    .key("endTime2")
-        //                    .value(endTime2)
-        //                    .key("cycle2")
-        //                    .value(cycle2)
-        //                    .key("activation2")
-        //                    .value(activation2)
-        //
-        //                    .key("startTime3")
-        //                    .value(startTime3)
-        //                    .key("endTime3")
-        //                    .value(endTime3)
-        //                    .key("cycle3")
-        //                    .value(cycle3)
-        //                    .key("activation3")
-        //                    .value(activation3)
-        //
-        //                    .endObject()
-        //                    .toString();
-        //
-        //        }
-        Log.d(TAG, " appDisableJsonStr--->" + appDisableJsonStr);
-        return appDisableJsonStr;
+        return isAppDisable;
     }
 
+    /**
+     * 根据条件判断该app是否在禁用时间段
+     *
+     * @param hour
+     * @param weekOfDate
+     * @param startTime
+     * @param endTime
+     * @param cycle
+     */
+    private boolean getAppDisableStatus(int hour, String weekOfDate, String startTime, String endTime, String cycle) {
+        boolean isAppDisable = false;
+        Log.d(TAG, "cycle--->" + cycle);
+        Log.d(TAG, "weekOfDate" + weekOfDate);
+        if (cycle.contains(weekOfDate)) {
+            if (startTime.startsWith("0")) {
+                startTime = startTime.substring(1);
+            }
+            String startTime1Hour = startTime.substring(0, startTime.length() - 2);
+            int startTime1Int = Integer.parseInt(startTime1Hour);
+            Log.d(TAG, "startTime1Int--->" + startTime1Int);
+
+            if (endTime.startsWith("0")) {
+                endTime = endTime.substring(1);
+            }
+            String endTime1Hour = endTime.substring(0, endTime.length() - 2);
+            int endTime1Int = Integer.parseInt(endTime1Hour);
+            Log.d(TAG, "endTime1Int--->" + endTime1Int);
+
+            if (startTime1Int <= hour && hour <= endTime1Int) {
+                //在时间段，禁用
+                isAppDisable = true;
+            } else {
+                isAppDisable = false;
+            }
+        } else {
+            //不在时间段，不禁用
+            isAppDisable = false;
+        }
+        return isAppDisable;
+    }
+
+    /**
+     * @param date
+     * @return
+     */
+    public String getWeekOfDate(Date date) {
+        String[] weekDays = {"7", "1", "2", "3", "4", "5", "6"};
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        int w = cal.get(Calendar.DAY_OF_WEEK) - 1;
+        if (w < 0)
+            w = 0;
+        return weekDays[w];
+    }
 
     //    protected boolean endCall() {
     //        boolean ret = false;
@@ -1075,8 +1147,11 @@ public class DeviceResponseUtil {
         //电量
         int intBattery = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
 
-        String v2Signal = "*WT," + serialNum + ",V2" + "," + hhmmss + "," + lastSignal + "," + gpsCount + "," + intBattery +
-                "," + steps + ",A, " + latitude + ",N," + longitude + ",E," + "," + ddmmyy + "," + "FDFFFFFF#";
+        String v2Signal = "*WT," + serialNum + ",V2" + "," +
+                hhmmss + "," + lastSignal + "," + gpsCount +
+                "," + intBattery + "," + steps + ",A," + latitude +
+                ",N," + longitude + ",E," + "," + ddmmyy + "," +
+                "FDFFFFFF#";
         return v2Signal;
     }
 }

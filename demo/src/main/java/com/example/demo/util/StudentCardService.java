@@ -49,7 +49,7 @@ public class StudentCardService extends Service {
     /**
      * 端口号
      */
-    //    public static final int PORT = 9098;
+    //    public static final int PORT = 9090;
     public static final int PORT = 8082;
 
     private long sendTime = 0L;
@@ -89,7 +89,7 @@ public class StudentCardService extends Service {
 
         String ddmmyy = new SimpleDateFormat("ddMMyy", Locale.getDefault()).format(new Date());
 
-        String serialNum = "0123456789ABCDEF";
+        String serialNum = "0123456789ABCDE";
 
         Log.d(StudentCardService.TAG, "hhmmss:" + hhmmss);
         Log.d(StudentCardService.TAG, "ddmmyy:" + ddmmyy);
@@ -434,15 +434,15 @@ public class StudentCardService extends Service {
                 String versionName = item.versionName;
                 Drawable appIcon = item.applicationInfo.loadIcon(pm);
                 if (isSystemApp(item)) {
-                    Log.w("PackageInfo", "系统应用---appName===>" + appName + "===packageName===>" + packageName +
+                    Log.w("AppPackage", "系统应用---appName===>" + appName + "===packageName===>" + packageName +
                             "===appIcon" + "===>" + appIcon);
                     appInfoEntity.setAppType("1");
                 } else {
-                    Log.d("PackageInfo", "非系统应用---appName===>" + appName + "===packageName===>" + packageName +
+                    Log.d("AppPackage", "非系统应用---appName===>" + appName + "===packageName===>" + packageName +
                             "===appIcon===>" + appIcon);
                     appInfoEntity.setAppType("2");
                 }
-                appInfoEntity.setAppName(appName);
+                appInfoEntity.setAppName(unicodeEncode(appName));
                 appInfoEntity.setPackageName(packageName);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -459,6 +459,25 @@ public class StudentCardService extends Service {
         boolean isSysApp = (pi.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 1;
         boolean isSysUpd = (pi.applicationInfo.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 1;
         return isSysApp || isSysUpd;
+    }
+
+    /**
+     * @Title: unicodeEncode
+     * @Description: unicode编码 将中文字符转换成Unicode字符
+     * @param string
+     * @return
+     */
+    public String unicodeEncode(String string) {
+        char[] utfBytes = string.toCharArray();
+        String unicodeBytes = "";
+        for (int i = 0; i < utfBytes.length; i++) {
+            String hexB = Integer.toHexString(utfBytes[i]);
+            if (hexB.length() <= 2) {
+                hexB = "00" + hexB;
+            }
+            unicodeBytes = unicodeBytes + "\\u" + hexB;
+        }
+        return unicodeBytes;
     }
 
 }
