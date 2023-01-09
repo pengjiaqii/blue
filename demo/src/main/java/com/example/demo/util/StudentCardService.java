@@ -3,17 +3,23 @@ package com.example.demo.util;
 import android.annotation.SuppressLint;
 import android.app.Service;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.LauncherActivityInfo;
+import android.content.pm.LauncherApps;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.UserHandle;
+import android.os.UserManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
@@ -27,6 +33,7 @@ import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -203,7 +210,7 @@ public class StudentCardService extends Service {
             @Override
             public void run() {
                 String returnUploadAppInfo = DeviceResponseUtil.getInstance(StudentCardService.this.getApplicationContext()
-                        , StudentCardService.this).uploadAppInfo(1, getPackageAppInfo());
+                        , StudentCardService.this).uploadAppInfo(1, getAppOnLauncher());
                 Log.i(TAG, "returnUploadAppInfo--->" + returnUploadAppInfo);
                 sendMsg(returnUploadAppInfo);
             }
@@ -383,8 +390,16 @@ public class StudentCardService extends Service {
                 Log.d(TAG, "----安装成功packageName:" + packageName);
                 Log.d(TAG, "----Uri:" + uri);
                 ArrayList<AppInfoEntity> appInfoEntities = new ArrayList<>(1);
+                List<AppInfoEntity> entities = getPackageAppInfo();
                 AppInfoEntity entity = new AppInfoEntity();
-                entity.setAppName("");
+                for (AppInfoEntity appInfoEntity : entities) {
+                    if(TextUtils.equals(appInfoEntity.getPackageName(),packageName)){
+                        entity.setAppName(appInfoEntity.getAppName());
+                        break;
+                    }else {
+                        entity.setAppName("");
+                    }
+                }
                 entity.setPackageName(packageName);
                 entity.setAppType("2");
                 appInfoEntities.add(entity);
@@ -423,7 +438,7 @@ public class StudentCardService extends Service {
         PackageManager pm = this.getPackageManager();
         @SuppressLint("WrongConstant")
         List<PackageInfo> installList = pm.getInstalledPackages(PackageManager.PERMISSION_GRANTED);
-        Log.d("PackageInfo", "install_app_size--->" + installList.size());
+        Log.d("AppPackage", "install_app_size--->" + installList.size());
         ArrayList<AppInfoEntity> appInfoEntities = new ArrayList<>();
         for (int i = 0; i < installList.size(); i++) {
             PackageInfo item = installList.get(i);
@@ -435,7 +450,7 @@ public class StudentCardService extends Service {
                 Drawable appIcon = item.applicationInfo.loadIcon(pm);
                 if (isSystemApp(item)) {
                     Log.w("AppPackage", "系统应用---appName===>" + appName + "===packageName===>" + packageName +
-                            "===appIcon" + "===>" + appIcon);
+                            "===appIcon===>" + appIcon);
                     appInfoEntity.setAppType("1");
                 } else {
                     Log.d("AppPackage", "非系统应用---appName===>" + appName + "===packageName===>" + packageName +
@@ -449,6 +464,64 @@ public class StudentCardService extends Service {
                 continue;
             }
             appInfoEntities.add(appInfoEntity);
+        }
+
+        return appInfoEntities;
+    }
+
+
+    private List<AppInfoEntity> getAppOnLauncher(){
+        ArrayList<AppInfoEntity> appInfoEntities = new ArrayList<>();
+
+        PackageManager mPackageManager = this.getApplicationContext().getPackageManager();
+        LauncherApps mLauncherApps = (LauncherApps) this.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+        UserManager mUserManager = (UserManager) this.getSystemService(Context.USER_SERVICE);
+        List<UserHandle> users = mUserManager.getUserProfiles();
+        List<UserHandle> profiles= users == null ? Collections.<UserHandle>emptyList() : users;
+
+        //根据手机所有用户获取每个用户下的应用
+        for (UserHandle user : profiles) {
+            // Query for the set of apps
+            final List<LauncherActivityInfo> apps = mLauncherApps.getActivityList(null, user);
+            Log.d("AppPackage", "getAppOnLauncher---size--->" + apps.size());
+            // Fail if we don't have any apps
+            // TODO: Fix this. Only fail for the current user.
+            if (apps == null || apps.isEmpty()) {
+                continue;
+            }
+            // Create the ApplicationInfos
+            for (int i = 0; i < apps.size(); i++) {
+                LauncherActivityInfo app = apps.get(i);
+                // This builds the icon bitmaps.
+                AppInfoEntity entity = new AppInfoEntity();
+                ComponentName componentName = app.getComponentName();
+                String packageName = componentName.getPackageName();
+                entity.setPackageName(packageName);
+                ApplicationInfo applicationInfo = new ApplicationInfo();
+                try {
+                    applicationInfo = mPackageManager.getApplicationInfo(packageName, 0);
+                } catch (PackageManager.NameNotFoundException e) {
+                    e.printStackTrace();
+                }
+                Drawable appIcon = applicationInfo.loadIcon(mPackageManager);
+
+                //filter system app
+                if ((applicationInfo.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0 ||
+                        (applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0) {
+                    String applicationName = (String) mPackageManager.getApplicationLabel(applicationInfo);
+                    entity.setAppName(unicodeEncode(applicationName));
+                    Log.w("AppPackage", "系统应用---appName===>" + applicationName + "===packageName===>" + packageName +
+                            "===appIcon===>" + appIcon);
+                    entity.setAppType("1");
+                }else {
+                    String applicationName = (String) mPackageManager.getApplicationLabel(applicationInfo);
+                    entity.setAppName(unicodeEncode(applicationName));
+                    Log.d("AppPackage", "非系统应用---appName===>" + applicationName + "===packageName===>" + packageName +
+                            "===appIcon===>" + appIcon);
+                    entity.setAppType("2");
+                }
+                appInfoEntities.add(entity);
+            }
         }
 
         return appInfoEntities;

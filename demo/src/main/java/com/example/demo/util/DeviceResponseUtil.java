@@ -115,7 +115,7 @@ public class DeviceResponseUtil {
     private ContentResolver resolver;
 
     private int lastSignal;
-    private float steps;
+    private int steps;
 
     public String handleCmdMessage(String message) {
         serialNum = SystemProperties.get("ro.serialno", "0123456789ABCDE");
@@ -251,7 +251,7 @@ public class DeviceResponseUtil {
             entity.setWl_phone(wl_phone);
             entity.setWl_type(wl_type);
             entity.setWl_meid(wl_meid);
-            entity.setWl_name(wl_name);
+            entity.setWl_name(unicodeDecode(wl_name));
             entity.setWl_pic(wl_pic);
             whiteListEntities.add(entity);
         }
@@ -281,7 +281,9 @@ public class DeviceResponseUtil {
     private String setSOSNumber(String message) {
         //        acquireUnLock();
         //*WT,IMEI,SETSOS,HHMMSS,sequence,name，phone，sequence1,name,phone,sequence2,name,phone#
-        String[] splitMeg = message.split(",");
+        String messageNoSharp = message.replace("#", "");
+
+        String[] splitMeg = messageNoSharp.split(",");
         for (int i = 0; i < splitMeg.length; i++) {
             Log.i(TAG, "meg-array：" + splitMeg[i]);
         }
@@ -308,14 +310,13 @@ public class DeviceResponseUtil {
         insertWhiteList(wl_num1, wl_name1, wl_phone1);
         insertWhiteList(wl_num2, wl_name2, wl_phone2);
 
+        float speed = LocationUtils.getInstance(mContext).getSpeed();
+        int direction = LocationUtils.getInstance(mContext).getDirection();
 
-        String setSOSReturnMsg = "*WT," + serialNum + ",V4" +
-                ",SETSOS," + lastTime + "," + hhmmss + "," +
-                splitMeg[4] + "," + splitMeg[5] + "," + splitMeg[6] +
-                "," + splitMeg[7] + "," + splitMeg[8] + "," +
-                splitMeg[9] + "," + splitMeg[10] + "," + splitMeg[11] +
-                "," + splitMeg[12] + ",V," + latitude + "," +
-                longitude + "," + ddmmyy + ",FDFFFFFF#";
+        String setSOSReturnMsg = "*WT," + serialNum + ",V4" + ",SETSOS," + lastTime + "," + hhmmss + "," +
+                splitMeg[4] + "," + splitMeg[5] + "," + splitMeg[6] + "," + splitMeg[7] + "," + splitMeg[8] + "," +
+                splitMeg[9] + "," + splitMeg[10] + "," + splitMeg[11] + "," + splitMeg[12] + ",V," + latitude + ",N," +
+                longitude + ",E," + speed + "," + direction + "," + ddmmyy + ",FDFFFFFF#";
         Log.i(TAG, " setSOSReturnMeg--->" + setSOSReturnMsg);
         return setSOSReturnMsg;
     }
@@ -504,8 +505,8 @@ public class DeviceResponseUtil {
         mAudioManager = (AudioManager) context.getSystemService(Service.AUDIO_SERVICE);
         mSensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
         MySensorEventListener mListener = new MySensorEventListener();
-        mSensorManager.registerListener(mListener, mSensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER),
-                SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(mListener, mSensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER), SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(mListener, mSensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR), SensorManager.SENSOR_DELAY_NORMAL);
 
         batteryManager = (BatteryManager) context.getSystemService(Context.BATTERY_SERVICE);
 
@@ -762,12 +763,12 @@ public class DeviceResponseUtil {
         StringBuilder allAppInfo = new StringBuilder();
         for (AppInfoEntity info : appInfoEntities) {
             allAppInfo.append(info.getAppName()).append(",").append(info.getAppType())
-                    .append(",").append(info.getPackageName());
+                    .append(",").append(info.getPackageName()).append(",");
         }
 
         String uploadAppInfoMsg = new StringBuilder().append("*WT,").append(serialNum).append(",UPLOADAPP,")
                 .append(hhmmss).append(",").append(type).append(",").append(appInfoEntities.size())
-                .append(",").append(allAppInfo).append(",").append(ddmmyy).append(",FDFFFFFF#").toString();
+                .append(",").append(allAppInfo).append(ddmmyy).append(",FDFFFFFF#").toString();
 
         Log.i(TAG, " uploadAppInfoMsg--->" + uploadAppInfoMsg);
         return uploadAppInfoMsg;
@@ -875,7 +876,7 @@ public class DeviceResponseUtil {
      * @return
      * @throws JSONException
      */
-    private String generateDisableInfo(String[] split, String currentGroupNum) {
+    private String generateDisableInfo(String[] split, String currentGroupNum) throws JSONException {
         String appDisableJsonStr = "";
         JSONStringer appDisable = new JSONStringer();
         JSONStringer jsonStringer = appDisable.object();
@@ -899,11 +900,11 @@ public class DeviceResponseUtil {
             try {
                 appStartDisable = isAppStartDisable(testString);
             } catch (JSONException e) {
-                Log.e("StudentCardService","JSONException--->"+e);
+                Log.e("StudentCardService", "JSONException--->" + e);
                 e.printStackTrace();
             }
         }
-        Log.e(TAG,"禁用应用吗？--->"+appStartDisable);
+        Log.e(TAG, "禁用应用吗？--->" + appStartDisable);
         Log.d(TAG, " appStartDisable--->" + appStartDisable);
 
         Log.d(TAG, " appDisableJsonStr--->" + appDisableJsonStr);
@@ -1100,7 +1101,7 @@ public class DeviceResponseUtil {
     private class MySensorEventListener implements SensorEventListener {
         @Override
         public void onSensorChanged(SensorEvent event) {
-            steps = event.values[0];
+            steps = (int) event.values[0];
             Log.i(TAG, "步数:" + steps);
         }
 
@@ -1143,15 +1144,17 @@ public class DeviceResponseUtil {
                 lastSignal = -113 + 2 * asu;
             }
         }, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
-        int gpsCount = LocationUtils.getInstance(mContext).getCurGpsStatus();
+        int gpsCount = LocationUtils.getInstance(mContext).getCurrentGpsCount();
+        float speed = LocationUtils.getInstance(mContext).getSpeed();
+        int direction = LocationUtils.getInstance(mContext).getDirection();
         //电量
         int intBattery = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
 
         String v2Signal = "*WT," + serialNum + ",V2" + "," +
                 hhmmss + "," + lastSignal + "," + gpsCount +
                 "," + intBattery + "," + steps + ",A," + latitude +
-                ",N," + longitude + ",E," + "," + ddmmyy + "," +
-                "FDFFFFFF#";
+                ",N," + longitude + ",E," + speed + "," + direction + ","
+                + ddmmyy + "," + "FDFFFFFF#";
         return v2Signal;
     }
 }
