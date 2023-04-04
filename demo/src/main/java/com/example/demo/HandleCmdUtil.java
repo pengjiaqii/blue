@@ -8,6 +8,7 @@ import android.os.Build;
 import android.provider.AlarmClock;
 import android.telephony.CellLocation;
 import android.telephony.TelephonyManager;
+import android.util.Log;
 
 import androidx.annotation.RequiresApi;
 
@@ -71,6 +72,7 @@ public class HandleCmdUtil {
         CellLocation cellLocation = telephonyManager.getCellLocation();
         //        String simSerialNumber = telephonyManager.getSimSerialNumber();
         //        String subscriberId = telephonyManager.getSubscriberId();
+
 
         if (message.contains("WT") && message.contains("GETIMEID")) {
             return handleGetImeidCmd();

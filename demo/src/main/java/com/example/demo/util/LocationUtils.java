@@ -16,6 +16,7 @@ import android.location.LocationProvider;
 import android.os.Bundle;
 import android.util.Log;
 
+import java.math.BigDecimal;
 import java.util.Iterator;
 import java.util.List;
 
@@ -42,11 +43,14 @@ public class LocationUtils {
     private float[] magneticFieldValues = new float[3];
 
     public double getLongitude() {
-        return longitude;
+        BigDecimal longitude100 = new BigDecimal(longitude).movePointRight(2);
+        return longitude100.doubleValue();
     }
 
     public double getLatitude() {
-        return latitude;
+        //跟后台定义的规则，小数点右移两位再传过去，不能直接乘以100会丢失精度
+        BigDecimal latitude100 = new BigDecimal(latitude).movePointRight(2);
+        return latitude100.doubleValue();
     }
 
     public float getSpeed() {

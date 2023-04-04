@@ -17,6 +17,7 @@ import android.hardware.SensorManager;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.BatteryManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
 import android.os.PowerManager;
@@ -41,6 +42,7 @@ import androidx.annotation.Nullable;
 import com.example.demo.R;
 import com.example.demo.db.WhiteListEntity;
 import com.example.demo.db.WhiteListUtil;
+import com.example.demo.sos.PowerButtonReceiverService;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -118,8 +120,18 @@ public class DeviceResponseUtil {
     private int steps;
 
     public String handleCmdMessage(String message) {
-        serialNum = SystemProperties.get("ro.serialno", "0123456789ABCDE");
-        Log.i(TAG, "serialNum===>" + serialNum);
+        if (TextUtils.isEmpty(message)) {
+            return "";
+        }
+
+        String IMEI = telephonyManager.getImei();
+        Log.d(TAG, "IMEI===>" + IMEI);
+        Log.d(TAG, "SystemProperties.get(\"ro.serialno\",)===>" + SystemProperties.get("ro.serialno", "UNKOWN"));
+        String deviceId = telephonyManager.getDeviceId();
+        Log.e(TAG, "deviceId===>" + deviceId);
+        serialNum = deviceId;
+
+        Log.d(TAG, "serialNum===>" + serialNum);
         //        String android_id=android.provider.Settings.System.getString(mContext.getContentResolver(), "android_id");
         //        Log.e(TAG, "android_id===>" + android_id);
         //        String barcode = SystemProperties.get("gsm.serial","barcode");
@@ -133,19 +145,27 @@ public class DeviceResponseUtil {
         latitude = LocationUtils.getInstance(mContext).getLatitude();
         longitude = LocationUtils.getInstance(mContext).getLongitude();
 
+        Log.e(TAG, "latitude==============>" + latitude);
+        Log.e(TAG, "longitude==============>" + longitude);
+
         currentMusic = mAudioManager.getStreamVolume(3);
         currentCall = mAudioManager.getStreamVolume(0);
 
         mContext.registerReceiver(mReceiver, mFilter);
 
-        String deviceId = telephonyManager.getDeviceId();
-        Log.e("IMEI", "deviceId===>" + deviceId);
+        //特殊处理，获取指令类型
+        String[] split = message.split(",");
+        String messageType = "";
+        if (split.length > 3) {
+            messageType = split[2];
+        }
+        Log.e(TAG, "指令类型===>" + messageType);
 
-        if (message.contains("WT") && message.contains("SETSOS")) {
+        if (message.contains("WT") && TextUtils.equals(messageType, "SETSOS")) {
             return setSOSNumber(message);
-        } else if (message.contains("WT") && message.contains("PBWL")) {
+        } else if (message.contains("WT") && TextUtils.equals(messageType, "PBWL")) {
             return setWhiteListNumber(message);
-        } else if (message.contains("WT") && message.contains("PBWLALL")) {
+        } else if (message.contains("WT") && TextUtils.equals(messageType, "PBWLALL")) {
             return setAllWhiteListNumber(message);
         } else if (message.contains("WT") && message.contains("D1")) {
             return handlePositionMonitorD1(message);
@@ -174,10 +194,11 @@ public class DeviceResponseUtil {
     private String setWhiteListNumber(String message) {
         //*XX,MEID,PBWL,HHMMSS,WL-num,wl-phone,wl_type,wl_meid,wl_name,wl_pic#
         //*WT,MEID,PBWL,140522,WL-num,17665136602,wl_type,wl_meid,\u661f\u671f\u4e09,wl_pic#
-        String[] splitMeg = message.split(",");
+        String messageNoSharp = message.replace("#", "");
+        String[] splitMeg = messageNoSharp.split(",");
         String lastTime = splitMeg[3];
         for (int i = 0; i < splitMeg.length; i++) {
-            Log.i(TAG, "meg-array：" + splitMeg[i]);
+            Log.i(TAG, "setWhiteListNumber：" + splitMeg[i]);
         }
 
         String wl_phone = splitMeg[5];
@@ -207,12 +228,14 @@ public class DeviceResponseUtil {
         WhiteListUtil.getInstance(mContext).query(wl_num);
         WhiteListUtil.getInstance(mContext).queryAll();
 
-        String pbwlReturnMsg = "*WT," + serialNum + ",V4" +
-                ",PBWL," + lastTime + "," + splitMeg[4] +
-                "," + splitMeg[5] + "," + splitMeg[6] +
-                "," + splitMeg[7] + "," + splitMeg[8] +
-                "," + hhmmss + ",V," + latitude + "," +
-                longitude + "," + ddmmyy + ",FFFFFFFD#";
+        float speed = LocationUtils.getInstance(mContext).getSpeed();
+        int orientation = LocationUtils.getInstance(mContext).getDirection();
+
+
+        String pbwlReturnMsg = "*WT," + serialNum + ",V4" + ",PBWL," + lastTime + "," + splitMeg[4] +
+                "," + splitMeg[5] + "," + splitMeg[6] + "," + splitMeg[7] + "," + splitMeg[8] + "," + splitMeg[9]
+                + "," + hhmmss + ",V," + latitude + ",N," + longitude + ",E," + speed + "," + orientation + "," + ddmmyy +
+                "," + "FFFDFFFF#";
         Log.i(TAG, " pbwlReturnMsg--->" + pbwlReturnMsg);
         return pbwlReturnMsg;
     }
@@ -229,23 +252,25 @@ public class DeviceResponseUtil {
          *WT,0000000000,PBWLALL,130305,1,13612345678,1,0,5C0F660E,1,2,13612345678,2,0,5C0F660E,1,3,13612345678,3,0,
          5C0F660E,1,4,13612345678,3,0,5C0F660E,1,5,13612345678,3,0,5C0F660E,1,6,13612345678,3,0,5C0F660E,1,7,13612345678,3,0,5C0F660E,1,8,13612345678,3,0,5C0F660E,1,9,13612345678,3,0,5C0F660E,1,10,13612345678,3,,,#
          */
-        String[] splitMeg = message.split(",");
+        String messageNoSharp = message.replace("#", "");
+        String[] splitMeg = messageNoSharp.split(",");
         String lastTime = splitMeg[3];
-        for (int i = 0; i < splitMeg.length; i++) {
-            Log.i(TAG, "meg-array：" + splitMeg[i]);
-        }
+
+        int msgLength = splitMeg.length;
+        //总长度减去跟白名单信息无关的指令，算出总共几组数据
+        int index = (msgLength - 4) / 7;
+        Log.d(TAG, "白名单信息数量：" + index);
 
         ArrayList<WhiteListEntity> whiteListEntities = new ArrayList<>();
 
-        //4-9位是第一个人信息，10-15位是第二个人信息，16-21位是第三个人信息，依次类推，有20个人
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < index; i++) {
             WhiteListEntity entity = new WhiteListEntity();
-            String wl_num = splitMeg[4 + (6 * i)];
-            String wl_phone = splitMeg[5 + (6 * i)];
-            String wl_type = splitMeg[6 + (6 * i)];
-            String wl_meid = splitMeg[7 + (6 * i)];
-            String wl_name = splitMeg[8 + (6 * i)];
-            String wl_pic = splitMeg[9 + (6 * i)];
+            String wl_num = splitMeg[4 + (7 * i)];
+            String wl_phone = splitMeg[5 + (7 * i)];
+            String wl_type = splitMeg[6 + (7 * i)];
+            String wl_meid = splitMeg[7 + (7 * i)];
+            String wl_name = splitMeg[8 + (7 * i)];
+            String wl_pic = splitMeg[9 + (7 * i)];
 
             entity.setWl_num(wl_num);
             entity.setWl_phone(wl_phone);
@@ -253,19 +278,38 @@ public class DeviceResponseUtil {
             entity.setWl_meid(wl_meid);
             entity.setWl_name(unicodeDecode(wl_name));
             entity.setWl_pic(wl_pic);
+
+            //插入数据库，方便后续查询
+            insertWhiteList(wl_num, unicodeDecode(wl_name), wl_phone);
+
             whiteListEntities.add(entity);
         }
 
-        Log.d(TAG, "whiteListEntities：" + whiteListEntities.size());
+
+        //        if (TextUtils.equals(wl_num, "1") || TextUtils.equals(wl_num, "2") || TextUtils.equals(wl_num, "3")) {
+        //            //sos号码1-3
+        //
+        //        } else if (TextUtils.equals(wl_num, "4") || TextUtils.equals(wl_num, "5") || TextUtils.equals(wl_num, "6")) {
+        //            //亲情号码4-6
+        //
+        //        }
+
+        Log.d(TAG, "获取到的whiteListEntities：" + whiteListEntities.size());
+        StringBuilder whiteListSb = new StringBuilder();
+
         for (WhiteListEntity entity : whiteListEntities) {
             Log.i(TAG, "WhiteListEntity：" + entity.toString());
+            whiteListSb.append(entity.getWl_num()).append(",").append(entity.getWl_phone()).append(",").append(entity.getWl_type())
+                    .append(",").append(entity.getWl_meid()).append(",").append(unicodeEncode(entity.getWl_name()))
+                    .append(",").append(entity.getWl_pic()).append(",").append("").append(",");
         }
 
-        String pbwlAllReturnMsg = "*WT," + serialNum + ",V4" +
-                ",PBWLALL," + lastTime + "," + splitMeg[4] + "," +
-                splitMeg[5] + "," + splitMeg[6] + "," + splitMeg[7] +
-                "," + hhmmss + ",A," + latitude + "," + longitude +
-                "," + ddmmyy + ",FFFFFFFF#";
+        float speed = LocationUtils.getInstance(mContext).getSpeed();
+        int orientation = LocationUtils.getInstance(mContext).getDirection();
+
+        String pbwlAllReturnMsg = "*WT," + serialNum + ",V4" + ",PBWLALL," + lastTime + "," + whiteListSb
+                + ",A," + latitude + ",N," + longitude + ",E," + speed + "," + orientation + "," + ddmmyy + "," +
+                "FFFDFFFF#";
 
         Log.i(TAG, " pbwlAllReturnMsg--->" + pbwlAllReturnMsg);
 
@@ -282,10 +326,12 @@ public class DeviceResponseUtil {
         //        acquireUnLock();
         //*WT,IMEI,SETSOS,HHMMSS,sequence,name，phone，sequence1,name,phone,sequence2,name,phone#
         String messageNoSharp = message.replace("#", "");
-
+        Log.i(TAG, "setSOSNumber---messageNoSharp：" + messageNoSharp);
         String[] splitMeg = messageNoSharp.split(",");
+
+
         for (int i = 0; i < splitMeg.length; i++) {
-            Log.i(TAG, "meg-array：" + splitMeg[i]);
+            Log.i(TAG, "setSOSNumber：" + splitMeg[i]);
         }
         String lastTime = splitMeg[3];
         String wl_num0 = splitMeg[4];
@@ -296,11 +342,15 @@ public class DeviceResponseUtil {
         String wl_name1 = unicodeDecode(splitMeg[8]);
         String wl_phone1 = splitMeg[9];
 
-        String wl_num2 = splitMeg[10];
-        String wl_name2 = unicodeDecode(splitMeg[11]);
-        String wl_phone2 = splitMeg[12];
-
-
+        String wl_num2 = "";
+        String wl_name2 = "";
+        String wl_phone2 = "";
+        //只填一个SOS的时候，后面2，3序号的姓名号码会返回空字符串，不单独处理会报错
+        if (!TextUtils.equals(splitMeg[splitMeg.length - 1], "3")) {
+            wl_num2 = splitMeg[10];
+            wl_name2 = unicodeDecode(splitMeg[11]);
+            wl_phone2 = splitMeg[12];
+        }
         Log.i(TAG, "sosPhone0：" + wl_phone0);
         Log.i(TAG, "sosPhone1：" + wl_phone1);
         Log.i(TAG, "sosPhone2：" + wl_phone2);
@@ -311,12 +361,22 @@ public class DeviceResponseUtil {
         insertWhiteList(wl_num2, wl_name2, wl_phone2);
 
         float speed = LocationUtils.getInstance(mContext).getSpeed();
-        int direction = LocationUtils.getInstance(mContext).getDirection();
+        int orientation = LocationUtils.getInstance(mContext).getDirection();
 
-        String setSOSReturnMsg = "*WT," + serialNum + ",V4" + ",SETSOS," + lastTime + "," + hhmmss + "," +
-                splitMeg[4] + "," + splitMeg[5] + "," + splitMeg[6] + "," + splitMeg[7] + "," + splitMeg[8] + "," +
-                splitMeg[9] + "," + splitMeg[10] + "," + splitMeg[11] + "," + splitMeg[12] + ",V," + latitude + ",N," +
-                longitude + ",E," + speed + "," + direction + "," + ddmmyy + ",FDFFFFFF#";
+        String setSOSReturnMsg = "";
+
+        if (!TextUtils.equals(splitMeg[splitMeg.length - 1], "3")) {
+            setSOSReturnMsg = "*WT," + serialNum + ",V4" + ",SETSOS," + lastTime + "," + hhmmss + "," +
+                    splitMeg[4] + "," + splitMeg[5] + "," + splitMeg[6] + "," + splitMeg[7] + "," + splitMeg[8] + "," +
+                    splitMeg[9] + "," + splitMeg[10] + "," + splitMeg[11] + "," + splitMeg[12] + ",V," + latitude + ",N," +
+                    longitude + ",E," + speed + "," + orientation + "," + ddmmyy + ",FDFFFFFF#";
+        } else {
+            setSOSReturnMsg = "*WT," + serialNum + ",V4" + ",SETSOS," + lastTime + "," + hhmmss + "," +
+                    splitMeg[4] + "," + splitMeg[5] + "," + splitMeg[6] + "," + splitMeg[7] + "," + splitMeg[8] + "," +
+                    splitMeg[9] + "," + splitMeg[10] + "," + "" + "," + "" + ",V," + latitude + ",N," +
+                    longitude + ",E," + speed + "," + orientation + "," + ddmmyy + ",FDFFFFFF#";
+        }
+
         Log.i(TAG, " setSOSReturnMeg--->" + setSOSReturnMsg);
         return setSOSReturnMsg;
     }
@@ -329,6 +389,8 @@ public class DeviceResponseUtil {
      * @param wl_phone
      */
     private void insertWhiteList(String wl_num, String wl_name, String wl_phone) {
+        //插入数据，编号，姓名，电话
+        Log.d(TAG, "要插入的数据：wl_num--->" + wl_num + "---wl_name--->" + wl_name + "---wl_phone--->" + wl_phone);
         if (null == wl_phone || wl_phone.isEmpty()) {
             //删除这条数据
             WhiteListUtil.getInstance(mContext).delete(wl_num);
@@ -336,15 +398,18 @@ public class DeviceResponseUtil {
             ArrayList<WhiteListEntity> entities = WhiteListUtil.getInstance(mContext).queryAll();
             entities.stream().forEach(
                     whiteListEntity -> {
-                        Log.d(TAG, "WhiteListEntity：" + whiteListEntity.toString());
                         if (wl_num.equals(whiteListEntity.getWl_num())) {
                             //编号相同的时候避免重复也先删除
                             WhiteListUtil.getInstance(mContext).delete(wl_num);
                         }
                     }
             );
-            //插入数据，编号，姓名，电话
+
             WhiteListUtil.getInstance(mContext).insert(wl_num, wl_name, wl_phone);
+        }
+        ArrayList<WhiteListEntity> listEntities = WhiteListUtil.getInstance(mContext).queryAll();
+        for (WhiteListEntity entity : listEntities) {
+            Log.d(TAG, "查询所有的：WhiteListEntity：" + entity.toString());
         }
     }
 
@@ -504,7 +569,7 @@ public class DeviceResponseUtil {
 
         mAudioManager = (AudioManager) context.getSystemService(Service.AUDIO_SERVICE);
         mSensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
-        MySensorEventListener mListener = new MySensorEventListener();
+        DeviceResponseUtil.MySensorEventListener mListener = new DeviceResponseUtil.MySensorEventListener();
         mSensorManager.registerListener(mListener, mSensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER), SensorManager.SENSOR_DELAY_NORMAL);
         mSensorManager.registerListener(mListener, mSensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR), SensorManager.SENSOR_DELAY_NORMAL);
 
@@ -669,6 +734,25 @@ public class DeviceResponseUtil {
         return string;
     }
 
+    /**
+     * @param string
+     * @return
+     * @Title: unicodeEncode
+     * @Description: unicode编码 将中文字符转换成Unicode字符
+     */
+    public String unicodeEncode(String string) {
+        char[] utfBytes = string.toCharArray();
+        String unicodeBytes = "";
+        for (int i = 0; i < utfBytes.length; i++) {
+            String hexB = Integer.toHexString(utfBytes[i]);
+            if (hexB.length() <= 2) {
+                hexB = "00" + hexB;
+            }
+            unicodeBytes = unicodeBytes + "\\u" + hexB;
+        }
+        return unicodeBytes;
+    }
+
     private void endCall() {
         Log.i(TAG, "===endCall===");
         TelecomManager tm = (TelecomManager) mContext.getSystemService(Context.TELECOM_SERVICE);
@@ -792,10 +876,10 @@ public class DeviceResponseUtil {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
-        Bitmap bitmap = BitmapFactory.decodeResource(mContext.getResources(), R.drawable.logo);
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
-        byte[] imageBytes = baos.toByteArray();
-        String imageString = Base64.encodeToString(imageBytes, Base64.DEFAULT);
+        //        Bitmap bitmap = BitmapFactory.decodeResource(mContext.getResources(), R.drawable.logo);
+        //        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+        //        byte[] imageBytes = baos.toByteArray();
+        //        String imageString = Base64.encodeToString(imageBytes, Base64.DEFAULT);
 
         StringBuilder allAppInfo = new StringBuilder();
         for (AppInfoEntity info : appInfoEntities) {
@@ -1146,14 +1230,14 @@ public class DeviceResponseUtil {
         }, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
         int gpsCount = LocationUtils.getInstance(mContext).getCurrentGpsCount();
         float speed = LocationUtils.getInstance(mContext).getSpeed();
-        int direction = LocationUtils.getInstance(mContext).getDirection();
+        int orientation = LocationUtils.getInstance(mContext).getDirection();
         //电量
         int intBattery = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
 
         String v2Signal = "*WT," + serialNum + ",V2" + "," +
                 hhmmss + "," + lastSignal + "," + gpsCount +
                 "," + intBattery + "," + steps + ",A," + latitude +
-                ",N," + longitude + ",E," + speed + "," + direction + ","
+                ",N," + longitude + ",E," + speed + "," + orientation + ","
                 + ddmmyy + "," + "FDFFFFFF#";
         return v2Signal;
     }
